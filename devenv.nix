@@ -13,6 +13,7 @@
     cargo-seek
     cargo-generate
     dbeaver-bin
+    lazygit
   ];
 
   # https://devenv.sh/languages/
