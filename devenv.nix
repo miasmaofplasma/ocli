@@ -2,7 +2,7 @@
 
 {
   env = {
-    TRACKIT_DB="./db/trackit.db";
+    OCLI_CONFIG = "./test-config.toml";
   };
 
   # https://devenv.sh/packages/

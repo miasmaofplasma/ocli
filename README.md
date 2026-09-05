@@ -32,6 +32,7 @@ The vault is shared with Obsidian and the Meta Bind plugin, so `ocli` is conserv
 | `ocli fm <field> <value>` | General frontmatter setter — type rules from config, refuses managed and ignored fields |
 | `ocli progress / note / decision / question "<text>"` | Append timestamped entries to the ticket's configured `##` sections |
 | `ocli questions [--all]` | Cross-vault view of unchecked Open Questions entries |
+| `ocli open` | Open the current ticket's note in Obsidian (via the `obsidian://` URI scheme; requires the note to exist). Lands after git-context inference |
 
 Status vocabulary: `Backlog → In Progress → In Review → Complete`, plus occasional `Blocked` — validated by `ocli status`, which keeps `done:` in sync with `Complete`.
 
@@ -40,9 +41,9 @@ Status vocabulary: `Backlog → In Progress → In Review → Complete`, plus oc
 All team-convention behavior lives in `~/.config/ocli/config.toml` (located via the `directories` crate; `--vault` overrides the vault path) so convention drift is a config edit, not a code change:
 
 ```toml
-vault = "/path/to/vault"
 
 [vault]
+root = "/path/to/vault"
 features_dir = "notes/features"
 people_dir   = "notes/people"
 
