@@ -11,7 +11,7 @@ fn main() -> Result<()> {
     init_tracing()?;
     let cli = Cli::parse();
     let config = Config::load(cli.vault.clone())?;
-    let _context = Context::new(config, cli);
+    let _context = Context::new(config, cli)?;
 
     tracing::debug!("ocli initialized");
     Ok(())

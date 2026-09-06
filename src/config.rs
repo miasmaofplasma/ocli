@@ -103,10 +103,6 @@ pub enum ConfigError {
     RelativeRoot(PathBuf),
     #[error("no vault root: set [vault] root in the config file, set OCLI_VAULT, or pass --vault")]
     MissingVaultRoot,
-    #[error("could not find vault at {0}")]
-    VaultDoesNotExist(String),
-    #[error("could not parse the vault location")]
-    MalformedVault,
 }
 
 #[derive(Debug, Deserialize)]
@@ -347,17 +343,6 @@ impl ConfigFile {
             .ok_or(ConfigError::MissingVaultRoot)?;
         if !root.is_absolute() {
             return Err(ConfigError::RelativeRoot(root));
-        }
-
-        if !root.exists() {
-            match root.to_str() {
-                Some(r) => {
-                    return Err(ConfigError::VaultDoesNotExist(r.to_string()));
-                }
-                None => {
-                    return Err(ConfigError::MalformedVault);
-                }
-            }
         }
 
         for name in self.frontmatter.types.keys() {
