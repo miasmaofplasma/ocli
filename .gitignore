@@ -3,3 +3,4 @@
 /.direnv
 AGENTS.md
 test-config.toml
+config.toml

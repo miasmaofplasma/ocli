@@ -1,10 +1,14 @@
 //! Region locator for Obsidian note text (D27 leaf): finds the frontmatter
-//! block and `#`-heading sections as byte ranges over the *original* text.
+//! block, `#`-heading sections, and the ocli footer marker (D8) as byte
+//! ranges over the *original* text.
 //!
 //! The file is a sequence of bytes; the parse is a labeled map of that same
 //! text — nothing is copied, re-serialized, or dropped, so the D11
 //! byte-preservation contract holds by construction.
 
+/// The footer marker (D8): a literal line marking everything after it as
+/// footer. ocli never writes past it; a note may omit it (no footer).
+pub const FOOTER_MARKER: &str = "<!-- ocli:footer -->";
 /// A byte range into [`Document`]'s original text.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct Span {
@@ -13,7 +17,8 @@ pub struct Span {
 }
 
 /// A `#`-heading and its content range: starts at the heading line itself
-/// and ends where the next heading starts (or at end of text).
+/// and ends where the next heading starts, at the footer marker, or at
+/// end of text.
 ///
 /// Names are bare (`"Progress"`, no `##`). What a name *means* — which
 /// sections ocli owns — is the domain layer's business (D19/D27); this
@@ -38,6 +43,9 @@ pub struct Document<'a> {
     frontmatter: Option<Span>,
     body: Span,
     sections: Vec<Section>,
+    /// First footer-marker line to end of text (D8); `None` when the note
+    /// has no marker.
+    footer: Option<Span>,
 }
 
 /// Frontmatter only counts when the file's very first line is exactly `---`
@@ -55,13 +63,15 @@ pub fn parse(text: &str) -> Document<'_> {
     let mut in_fence = false;
     let mut current: Option<TempSection> = None;
     let mut sections: Vec<Section> = Vec::new();
+    let mut footer_start: Option<usize> = None;
     let mut offset = 0;
 
     for (line_num, chunk) in text.split_inclusive('\n').enumerate() {
         // Line content without its terminator. Works uniformly for LF,
         // CRLF, and the unterminated final line.
-        let line =
-            chunk.strip_suffix('\n').map_or(chunk, |l| l.strip_suffix('\r').unwrap_or(l));
+        let line = chunk
+            .strip_suffix('\n')
+            .map_or(chunk, |l| l.strip_suffix('\r').unwrap_or(l));
         let eol = offset + chunk.len();
 
         if in_frontmatter {
@@ -87,9 +97,27 @@ pub fn parse(text: &str) -> Document<'_> {
                 in_fence = !in_fence;
             }
 
+            // Footer marker (D8): the first marker line outside any fence
+            // ends the content region. Everything from it to EOF is footer —
+            // ocli never writes past it, and headings inside the footer are
+            // not content sections.
+            if footer_start.is_none() && !in_fence && line.trim() == FOOTER_MARKER {
+                // Close-on-successor: the open section ends at the marker.
+                if let Some(prev) = current.take() {
+                    sections.push(Section {
+                        name: prev.name,
+                        content: Span {
+                            start: prev.start,
+                            end: offset,
+                        },
+                    });
+                }
+                footer_start = Some(offset);
+            }
             // Headings: 1–6 `#`, then space-or-end-of-line, flush-left
             // (CommonMark). `#hashtag` and `#######` are not headings.
-            if !in_fence && !line.starts_with(char::is_whitespace) {
+            else if footer_start.is_none() && !in_fence && !line.starts_with(char::is_whitespace)
+            {
                 let hashes = line.chars().take_while(|&c| c == '#').count();
                 let rest = &line[hashes..];
                 let is_heading =
@@ -101,7 +129,10 @@ pub fn parse(text: &str) -> Document<'_> {
                     if let Some(prev) = current.take() {
                         sections.push(Section {
                             name: prev.name,
-                            content: Span { start: prev.start, end: offset },
+                            content: Span {
+                                start: prev.start,
+                                end: offset,
+                            },
                         });
                     }
                     current = Some(TempSection {
@@ -121,7 +152,10 @@ pub fn parse(text: &str) -> Document<'_> {
     if let Some(prev) = current.take() {
         sections.push(Section {
             name: prev.name,
-            content: Span { start: prev.start, end: text.len() },
+            content: Span {
+                start: prev.start,
+                end: text.len(),
+            },
         });
     }
 
@@ -131,7 +165,15 @@ pub fn parse(text: &str) -> Document<'_> {
         frontmatter: frontmatter_end.map(|end| Span { start: 0, end }),
         // Tiling by construction: body starts where frontmatter ended (or
         // at 0) and runs to the end. Empty text → 0..0.
-        body: Span { start: body_start, end: text.len() },
+        body: Span {
+            start: body_start,
+            end: text.len(),
+        },
+        // First footer marker to EOF, or None (D8).
+        footer: footer_start.map(|start| Span {
+            start,
+            end: text.len(),
+        }),
         sections,
     }
 }
@@ -157,8 +199,15 @@ impl<'a> Document<'a> {
     pub fn body(&self) -> Span {
         self.body
     }
+    /// The footer region (D8): from the first footer-marker line to the end
+    /// of text, marker line included. `None` when the note has no marker —
+    /// ocli then treats the whole body as content.
+    pub fn footer(&self) -> Option<Span> {
+        self.footer
+    }
 
-    /// `#`-heading sections found in the body, in document order.
+    /// `#`-heading sections in the content region (footer excluded), in
+    /// document order.
     pub fn sections(&self) -> &[Section] {
         &self.sections
     }
@@ -189,8 +238,7 @@ mod tests {
 
         for section in doc.sections() {
             assert!(
-                section.content.start >= doc.body().start
-                    && section.content.end <= doc.body().end,
+                section.content.start >= doc.body().start && section.content.end <= doc.body().end,
                 "section {:?} must live inside the body",
                 section.name
             );
@@ -243,7 +291,9 @@ mod tests {
         let text = "---\n---\nbody text\n";
         let doc = parse(text);
         assert_tiling(&doc, text);
-        let fm = doc.frontmatter().expect("empty frontmatter is still frontmatter");
+        let fm = doc
+            .frontmatter()
+            .expect("empty frontmatter is still frontmatter");
         assert_eq!(doc.get(fm), "---\n---\n");
         assert_eq!(doc.get(doc.body()), "body text\n");
     }
@@ -330,5 +380,90 @@ mod tests {
         assert_tiling(&doc, text);
         assert_eq!(doc.sections().len(), 1);
         assert_eq!(doc.sections()[0].name, "Relates to");
+    }
+
+    #[test]
+    fn footer_marker_clamps_sections_and_hides_footer_headings() {
+        let text = concat!(
+            "## Progress\n",
+            "- did a thing\n",
+            "<!-- ocli:footer -->\n",
+            "# Relates to\n",
+            "```meta-bind\n",
+            "INPUT[listSuggester:relates-to]\n",
+            "```\n",
+        );
+        let doc = parse(text);
+        assert_tiling(&doc, text);
+
+        let marker_start = text.find(FOOTER_MARKER).unwrap();
+        let footer = doc.footer().expect("marker present");
+        assert_eq!(
+            footer,
+            Span {
+                start: marker_start,
+                end: text.len()
+            }
+        );
+        assert_eq!(
+            doc.get(footer),
+            "<!-- ocli:footer -->\n# Relates to\n```meta-bind\nINPUT[listSuggester:relates-to]\n```\n"
+        );
+
+        let sections = doc.sections();
+        assert_eq!(
+            sections.len(),
+            1,
+            "footer headings are not content sections"
+        );
+        assert_eq!(sections[0].name, "Progress");
+        assert_eq!(
+            sections[0].content.end, marker_start,
+            "content clamps at the marker line"
+        );
+    }
+
+    #[test]
+    fn marker_inside_fence_is_not_a_footer() {
+        let text = "## Notes\n```text\n<!-- ocli:footer -->\n```\n# After\n";
+        let doc = parse(text);
+        assert_tiling(&doc, text);
+        assert!(doc.footer().is_none(), "marker inside a fence is content");
+        assert_eq!(doc.sections().len(), 2);
+        assert_eq!(doc.sections()[1].name, "After");
+    }
+
+    #[test]
+    fn first_marker_wins_and_later_ones_are_footer_text() {
+        let text = "<!-- ocli:footer -->\n# Widgets\n<!-- ocli:footer -->\n";
+        let doc = parse(text);
+        assert_tiling(&doc, text);
+        assert_eq!(doc.footer().expect("footer present").start, 0);
+        assert!(
+            doc.sections().is_empty(),
+            "everything after the marker is footer"
+        );
+    }
+
+    #[test]
+    fn marker_may_be_indented_and_crlf_terminated() {
+        let text = "## Progress\r\n- entry\r\n  <!-- ocli:footer -->  \r\n# Widgets\r\n";
+        let doc = parse(text);
+        assert_tiling(&doc, text);
+        assert!(
+            doc.footer().is_some(),
+            "trimmed line matches, CRLF tolerated"
+        );
+        assert_eq!(doc.sections().len(), 1);
+    }
+
+    #[test]
+    fn marker_inside_frontmatter_is_ignored() {
+        let text = "---\n<!-- ocli:footer -->\n---\n## Notes\n";
+        let doc = parse(text);
+        assert_tiling(&doc, text);
+        assert!(doc.footer().is_none());
+        assert_eq!(doc.sections().len(), 1);
+        assert_eq!(doc.sections()[0].name, "Notes");
     }
 }

@@ -471,46 +471,6 @@ impl Config {
     }
 }
 
-//fn load_config() -> Result<Config> {
-//     let (source, path) = match std::env::var_os("OCLI_CONFIG") {
-//         Some(v) => (config::ConfigSource::EnvOverride, PathBuf::from(v)),
-//         None => (
-//             config::ConfigSource::Default,
-//             ocli::config::default_config_path()?,
-//         ),
-//     };
-//     tracing::debug!(path = %path.display(), ?source, "resolving config");
-//     Config::load_or_hint(&path, source)
-// }
-
-// impl Config {
-//     /// Load with first-run diagnostics: a missing file at the *default*
-//     /// location gets onboarding help; a missing file behind an env
-//     /// override reports the override instead of masquerading as a fresh
-//     /// install. A missing config is a signal (D26) — never auto-created.
-//     pub fn load_or_hint(source: ConfigSource) -> color_eyre::eyre::Result<Config> {
-//         if !path.exists() {
-//             return match source {
-//                 ConfigSource::Default => Err(color_eyre::eyre::eyre!(
-//                     "no config file at {}\n\
-//                      \n\
-//                      ocli needs a config to know your vault. Create {} containing:\n\
-//                      \n\
-//                      [vault]\n\
-//                      root = \"/path/to/your/vault\"",
-//                     path.display(),
-//                     path.display(),
-//                 )),
-//                 ConfigSource::EnvOverride => Err(color_eyre::eyre::eyre!(
-//                     "OCLI_CONFIG points to {}, which does not exist",
-//                     path.display(),
-//                 )),
-//             };
-//         }
-//         Self::load(path)
-//     }
-// }
-//
 /// Where a config path came from — drives missing-file diagnostics.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum ConfigSource {

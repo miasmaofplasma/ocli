@@ -29,9 +29,7 @@ impl Context {
         // is_dir, not exists: a file at the configured root would pass an
         // existence check and then blow up on the first directory read.
         if !config.vault.root.is_dir() {
-            return Err(ContextError::VaultDoesNotExist(
-                config.vault.root.clone(),
-            ));
+            return Err(ContextError::VaultDoesNotExist(config.vault.root.clone()));
         }
 
         Ok(Self { config, cli })

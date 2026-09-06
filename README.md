@@ -20,7 +20,7 @@ The vault is shared with Obsidian and the Meta Bind plugin, so `ocli` is conserv
 - **Writes** only two things:
   1. Frontmatter fields it manages (`status`, `done`, `Created`, `repo`, `owner`) — via surgical line edits; `fm` writes other fields per config types, never `ignore`-listed ones.
   2. CLI-owned `##` markdown sections it creates on demand (Progress, Notes, Decisions, Open Questions — names from config).
-- Everything else in a note is never touched.
+- Everything else in a note is never touched — in particular, ocli never writes past the `<!-- ocli:footer -->` footer marker; everything after it is plugin/widget territory (D8).
 
 ## Planned commands (v1)
 
@@ -38,7 +38,7 @@ Status vocabulary: `Backlog → In Progress → In Review → Complete`, plus oc
 
 ## Configuration
 
-All team-convention behavior lives in `~/.config/ocli/config.toml` (located via the `directories` crate; `--vault` overrides the vault path) so convention drift is a config edit, not a code change:
+All team-convention behavior lives in the config file (default `~/.config/ocli/config.toml`, overridable via `OCLI_CONFIG`) so convention drift is a config edit, not a code change. The vault root resolves with strict precedence: `--vault` flag > `OCLI_VAULT` > `[vault] root` — the config file is optional when a vault root comes from elsewhere.
 
 ```toml
 
@@ -75,4 +75,4 @@ id             = '{FeatureType}-{TicketNumber}'
 - Rust (edition 2024), built with cargo; devenv/nix for tooling (`.envrc` + `devenv.nix`).
 - Testing uses a fixture vault under `tests/` — never the real vault.
 - Key dependencies: `clap`, `yaml_serde`, `toml`, `gix` (gitoxide — pure-Rust git access), `directories`, `regex`, `thiserror`/`color-eyre`, `tracing` + `tracing-subscriber`.
-- Project status: **planning**. See `PLAN.md` for design decisions, remaining work, and open questions. `AGENTS.md` covers how AI assistance is used in this repo.
+- Project status: **early implementation** — config (parse/validate/three-source resolution), the span-based note region locator, and the CLI skeleton are landed and tested; the read path (`list`) is in progress. See `PLAN.md` for design decisions, remaining work, and open questions. `AGENTS.md` covers how AI assistance is used in this repo.
