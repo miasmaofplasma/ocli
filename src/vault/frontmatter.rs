@@ -1,6 +1,8 @@
 use serde::Deserialize;
 
 use crate::vault::VaultError;
+#[cfg(test)]
+use crate::vault::error_chain;
 
 /// A read-only projection of the frontmatter fields ocli consumes — never
 /// a mirror of the note's schema. Unknown fields are ignored (D5: they are
@@ -70,9 +72,10 @@ mod tests {
 
     #[test]
     fn wrong_typed_field_errors_naming_the_field() {
-        // The `list` skip-and-warn policy keys off this error naming the field.
+        // The `list` skip-and-warn policy keys off this error naming the
+        // field — via the source chain (Display is cause-free by design).
         let err = deserialize_frontmatter("status: [a, b]\n").unwrap_err();
-        assert!(err.to_string().contains("status"), "got: {err}");
+        assert!(error_chain(&err).contains("status"), "got: {err}");
     }
 
     #[test]
@@ -84,7 +87,7 @@ mod tests {
 
         // Unquoted `yes` is a YAML 1.1 bool, not 1.2 — a string here.
         let err = deserialize_frontmatter("done: yes\n").unwrap_err();
-        assert!(err.to_string().contains("done"), "got: {err}");
+        assert!(error_chain(&err).contains("done"), "got: {err}");
     }
 
     #[test]

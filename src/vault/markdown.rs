@@ -6,6 +6,8 @@
 //! text — nothing is copied, re-serialized, or dropped, so the D11
 //! byte-preservation contract holds by construction.
 
+use std::ops::Bound;
+
 /// The footer marker (D8): a literal line marking everything after it as
 /// footer. ocli never writes past it; a note may omit it (no footer).
 pub const FOOTER_MARKER: &str = "<!-- ocli:footer -->";
@@ -14,6 +16,23 @@ pub const FOOTER_MARKER: &str = "<!-- ocli:footer -->";
 pub struct Span {
     pub start: usize,
     pub end: usize,
+}
+
+impl std::ops::RangeBounds<usize> for Span {
+    fn start_bound(&self) -> std::ops::Bound<&usize> {
+        Bound::Included(&self.start)
+    }
+
+    fn end_bound(&self) -> std::ops::Bound<&usize> {
+        Bound::Included(&self.end)
+    }
+}
+
+impl std::ops::Index<Span> for str {
+    type Output = str;
+    fn index(&self, span: Span) -> &str {
+        &self[span.start..span.end]
+    }
 }
 
 /// A `#`-heading and its content range: starts at the heading line itself

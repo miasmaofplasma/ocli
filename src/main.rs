@@ -1,5 +1,5 @@
 use clap::Parser;
-use color_eyre::eyre::{Result, WrapErr};
+use color_eyre::eyre::{Result, WrapErr, bail};
 use ocli::{cli::Cli, config::Config, context::Context};
 use tracing_subscriber::EnvFilter;
 
@@ -11,9 +11,20 @@ fn main() -> Result<()> {
     init_tracing()?;
     let cli = Cli::parse();
     let config = Config::load(cli.vault.clone())?;
-    let _context = Context::new(config, cli)?;
-
+    let context = Context::new(config, cli, &std::env::current_dir()?)?;
     tracing::debug!("ocli initialized");
+
+    match &context.cli().command {
+        ocli::cli::Command::List { .. } => {
+            let rows = ocli::commands::list::run(&context)?;
+            for row in rows {
+                println!("{row}");
+            }
+        }
+        ocli::cli::Command::New { .. } => bail!("not implemented"),
+        ocli::cli::Command::Open => bail!("not implemented"),
+    };
+
     Ok(())
 }
 

@@ -10,7 +10,7 @@ yaml_serde = "0.10"
 toml = "1"
 directories = "6"
 regex = "1"
-gix = "0.87"
+gix = { version = "0.87", default-features = false, features = ["sha1"] }
 thiserror = "2"
 color-eyre = "0.6"
 tracing = "0.1"

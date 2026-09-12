@@ -469,6 +469,17 @@ impl Config {
         file.validate()
             .wrap_err_with(|| format!("invalid config in {}", path.display()))
     }
+
+    /// Programmatic constructor: validated config for an explicit vault
+    /// root, all other settings at defaults. Bypasses file *discovery*,
+    /// not *validation* — `validate` still enforces absoluteness and every
+    /// policy check, so anything `Config::load` would reject is rejected
+    /// here too. Used by integration tests and future embedders.
+    pub fn for_vault(root: PathBuf) -> Result<Self, ConfigError> {
+        let mut file = ConfigFile::default();
+        file.vault.root = Some(root);
+        file.validate()
+    }
 }
 
 /// Where a config path came from — drives missing-file diagnostics.

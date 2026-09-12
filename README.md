@@ -26,8 +26,8 @@ The vault is shared with Obsidian and the Meta Bind plugin, so `ocli` is conserv
 
 | Command | Effect |
 |---|---|
-| `ocli new [--description "..."]` | Render the vault's QuickAdd template into `features/<ID>.md` — ticket inferred from the branch (explicit key still accepted); fills `repo`, `Created`, `owner`, `description`; refuses to overwrite |
-| `ocli list [--status S] [--all-repos]` | Scan `features/`, print ID / title / status / repo; defaults to the current repo's tickets |
+| `ocli new [--description "..."]` | Render the vault's QuickAdd template into `features/<ID>.md` — ticket inferred from the branch (explicit key still accepted); fills `repo` and `description`, `Created` via the template's `{{DATE}}`; refuses to overwrite |
+| `ocli list [--status S] [--all-repos]` | Scan `features/`, print one block per ticket — id / description / status / repository, `-` for unset values; `--status` exact-matches the note's status; shows all repos until git context lands (D13/Phase 5) |
 | `ocli status <Status>` | Update the inferred ticket's status; keeps `done:` in sync |
 | `ocli fm <field> <value>` | General frontmatter setter — type rules from config, refuses managed and ignored fields |
 | `ocli progress / note / decision / question "<text>"` | Append timestamped entries to the ticket's configured `##` sections |
@@ -75,4 +75,4 @@ id             = '{FeatureType}-{TicketNumber}'
 - Rust (edition 2024), built with cargo; devenv/nix for tooling (`.envrc` + `devenv.nix`).
 - Testing uses a fixture vault under `tests/` — never the real vault.
 - Key dependencies: `clap`, `yaml_serde`, `toml`, `gix` (gitoxide — pure-Rust git access), `directories`, `regex`, `thiserror`/`color-eyre`, `tracing` + `tracing-subscriber`.
-- Project status: **early implementation** — config (parse/validate/three-source resolution), the span-based note region locator, and the CLI skeleton are landed and tested; the read path (`list`) is in progress. See `PLAN.md` for design decisions, remaining work, and open questions. `AGENTS.md` covers how AI assistance is used in this repo.
+- Project status: **early-mid implementation** — config (parse/validate/three-source resolution), the markdown span locator, the frontmatter read projection, `Note` loading, the features-directory scan, the `list` command, and the git layer are landed and tested — 79 tests across unit and integration tiers. Git specifics: a `gix` adapter (branch/origin discovery) behind a crate-private wall with `context()` as its only fact, and the `Context` object carries the git snapshot (branch + repo identity) derived tolerantly from the working directory — every command can ask "which ticket am I on, which repo is this" without touching git internals. `new`/`open` are accepted-but-unimplemented. See `PLAN.md` for design decisions, remaining work, and open questions. `AGENTS.md` covers how AI assistance is used in this repo.

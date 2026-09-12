@@ -5,8 +5,8 @@ use clap::{Parser, Subcommand};
 #[derive(Debug, Subcommand)]
 pub enum Command {
     List {
-        #[arg(long)]
-        all: bool,
+        #[arg(long, default_value_t = false)]
+        all_repos: bool,
         #[arg(long)]
         status: Option<String>,
     },
