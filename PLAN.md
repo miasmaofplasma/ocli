@@ -34,7 +34,7 @@ Living document: design decisions, remaining work, open questions. Rules for thi
 - **D6 — fixture vaults only.** Integration tests copy `tests/fixtures/` into temp dirs; the real vault is never touched by any command, test, or example.
 - **D9 — `yaml_serde`** for frontmatter. `serde_yaml` is archived; `serde_yml` is unsound (RUSTSEC-2025-0068); this is the maintained fork.
 - **D10 — sync IO, no async runtime.** File ops are microseconds; nothing waits. Revisit only if a network feature lands.
-- **D28 — dependency set** (supersedes D3): `clap` (derive), `serde`, `toml`, `directories`, `regex`, `thiserror`, `color-eyre`, `tracing` + `tracing-subscriber` (env-filter), `yaml_serde 0.10`, `gix 0.87` (pinned, D14); dev `tempfile`. Deliberately not adopted: `tokio`, `async-trait`, `sqlx` — nothing here waits (D1/D10).
+- **D28 — dependency set** (supersedes D3): `clap` (derive), `serde`, `toml`, `directories`, `regex`, `chrono 0.4` (feature-trimmed: `clock`, `std`; one house format via integer accessors — added Phase 5 for `{{DATE}}`), `thiserror`, `color-eyre`, `tracing` + `tracing-subscriber` (env-filter), `yaml_serde 0.10`, `gix 0.87` (pinned, D14); dev `tempfile`. Deliberately not adopted: `tokio`, `async-trait`, `sqlx` — nothing here waits (D1/D10).
 
 ### Config
 

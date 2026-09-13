@@ -2,7 +2,7 @@ use std::path::Path;
 
 use crate::vault::{
     VaultError,
-    frontmatter::{Frontmatter, deserialize_frontmatter},
+    frontmatter::{Frontmatter, deserialize_frontmatter, inner_yaml},
     markdown::{self},
 };
 
@@ -75,15 +75,6 @@ impl Note {
     pub fn name(&self) -> &str {
         &self.name
     }
-}
-
-fn inner_yaml(fm: &str) -> &str {
-    let inner = fm.split_once('\n').map(|(_, rest)| rest).unwrap_or("");
-    inner
-        .strip_suffix("---\r\n")
-        .or_else(|| inner.strip_suffix("---\n"))
-        .or_else(|| inner.strip_suffix("---"))
-        .unwrap_or(inner)
 }
 
 #[cfg(test)]

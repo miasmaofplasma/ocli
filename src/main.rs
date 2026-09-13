@@ -21,7 +21,10 @@ fn main() -> Result<()> {
                 println!("{row}");
             }
         }
-        ocli::cli::Command::New { .. } => bail!("not implemented"),
+        ocli::cli::Command::New { .. } => {
+            let path = ocli::commands::new::run(&context)?;
+            println!("{}", path.display());
+        }
         ocli::cli::Command::Open => bail!("not implemented"),
     };
 

@@ -27,6 +27,18 @@ impl TestVault {
         Self::build(temp, args)
     }
 
+    /// Fixture vault + git discovery from `repo_dir` — for commands that
+    /// need branch/repo identity (`new`). `repo_dir` must outlive the
+    /// returned vault (keep its temp dir in the test).
+    pub fn fixture_with_git(
+        args: &[&str],
+        repo_dir: &std::path::Path,
+    ) -> color_eyre::eyre::Result<Self> {
+        let temp = tempfile::tempdir().wrap_err("creating temp dir")?;
+        copy_dir(&fixture_root(), temp.path())?;
+        Self::build_with(temp, args, repo_dir)
+    }
+
     /// An empty vault: root and `notes/features` exist, no notes inside.
     pub fn empty(args: &[&str]) -> color_eyre::eyre::Result<Self> {
         let temp = tempfile::tempdir().wrap_err("creating temp dir")?;
@@ -35,14 +47,25 @@ impl TestVault {
     }
 
     fn build(temp: tempfile::TempDir, args: &[&str]) -> color_eyre::eyre::Result<Self> {
+        Self::build_with(
+            temp,
+            args,
+            // Git discovery starts outside any repo (a fresh temp path) —
+            // vault fixtures test the no-git degraded path; tests that
+            // need a repo build one via the git helpers and pass it here.
+            std::path::Path::new("/nonexistent-no-repo"),
+        )
+    }
+
+    fn build_with(
+        temp: tempfile::TempDir,
+        args: &[&str],
+        git_start: &std::path::Path,
+    ) -> color_eyre::eyre::Result<Self> {
         let config = Config::for_vault(temp.path().to_path_buf())?;
         let cli = Cli::parse_from(std::iter::once("ocli").chain(args.iter().copied()));
-        // Git discovery starts outside any repo (a fresh temp path) —
-        // vault fixtures test the no-git degraded path; tests that need a
-        // repo build one via the git helpers and read its snapshot
-        // directly.
-        let context = Context::new(config, cli, std::path::Path::new("/nonexistent-no-repo"))
-            .map_err(color_eyre::eyre::Report::new)?;
+        let context =
+            Context::new(config, cli, git_start).map_err(color_eyre::eyre::Report::new)?;
         Ok(Self {
             _temp: temp,
             context,

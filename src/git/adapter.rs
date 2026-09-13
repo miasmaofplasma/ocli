@@ -70,7 +70,6 @@ impl GitRepo {
             .map(|n| n.to_string_lossy().into_owned())
             .unwrap_or_else(|| "unknown".to_string())
     }
-
 }
 
 /// Normalizes an origin URL to a repo name (D13): the last path segment

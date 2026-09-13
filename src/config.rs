@@ -3,8 +3,9 @@ use regex::Regex;
 use std::{
     collections::BTreeMap,
     path::{Path, PathBuf},
-    str::FromStr,
 };
+
+use crate::ftypes::FieldType;
 
 use serde::Deserialize;
 use thiserror::Error;
@@ -41,8 +42,6 @@ pub const MANAGED_FIELDS: &[(&str, &str)] = &[
 
 #[derive(Debug, Error)]
 pub enum ConfigFileError {
-    #[error("{0} is not a valid field type")]
-    FieldTypeError(String),
     /// Recoverable: the caller may proceed when the vault root comes from
     /// --vault or OCLI_VAULT instead of the config file.
     #[error("could not find the config file at {path}")]
@@ -126,47 +125,8 @@ impl Default for VaultDirs {
     }
 }
 
-#[derive(Debug, PartialEq)]
-pub enum FieldType {
-    String,
-    Int,
-    Float,
-    Bool,
-    Olink,
-    List(Box<FieldType>),
-}
-
-impl<'de> Deserialize<'de> for FieldType {
-    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
-    where
-        D: serde::Deserializer<'de>,
-    {
-        let s = String::deserialize(deserializer)?;
-        s.parse().map_err(serde::de::Error::custom)
-    }
-}
-
-impl FromStr for FieldType {
-    type Err = ConfigFileError;
-
-    fn from_str(s: &str) -> Result<Self, Self::Err> {
-        match s.trim().to_ascii_lowercase().as_str() {
-            "string" => Ok(Self::String),
-            "int" => Ok(Self::Int),
-            "float" => Ok(Self::Float),
-            "bool" => Ok(Self::Bool),
-            "olink" => Ok(Self::Olink),
-            other => {
-                let inner = other
-                    .strip_prefix("list<")
-                    .and_then(|r| r.strip_suffix(">"))
-                    .ok_or_else(|| ConfigFileError::FieldTypeError(other.into()))?;
-                Ok(Self::List(Box::new(inner.parse()?)))
-            }
-        }
-    }
-}
-
+/// The `[frontmatter]` type-table vocabulary lives in [`crate::ftypes`]
+/// (D18/D31): config declares the types, the write path emits the values.
 #[derive(Debug, Deserialize)]
 pub struct FrontmatterCfg {
     #[serde(default = "default_ignore")]
@@ -291,19 +251,6 @@ pub struct Config {
 pub struct Tickets {
     pub pattern: Regex,
     pub id: String,
-}
-impl Tickets {
-    /// Ticket ID for a branch match: named captures → id template (D21).
-    /// Missing captures are a caller error; the caller checks `is_match`.
-    pub fn id_for(&self, caps: &regex::Captures<'_>) -> String {
-        let mut out = self.id.clone();
-        for name in self.pattern.capture_names().flatten() {
-            if let Some(value) = caps.name(name) {
-                out = out.replace(&format!("{{{name}}}"), value.as_str());
-            }
-        }
-        out
-    }
 }
 
 impl ConfigFile {
@@ -738,10 +685,12 @@ mod tests {
     fn validate_produces_compiled_pattern_and_working_id() {
         let cfg = valid_minimal().validate().unwrap();
 
+        // Composition over the compiled pattern is `vault::note_name`'s
+        // business (tested there); this pins what validate() owns: the
+        // compiled pattern and its named captures.
         let caps = cfg.tickets.pattern.captures("BCP-74043-fix-login").unwrap();
         assert_eq!(caps.name("FeatureType").unwrap().as_str(), "BCP");
         assert_eq!(caps.name("TicketNumber").unwrap().as_str(), "74043");
-        assert_eq!(cfg.tickets.id_for(&caps), "BCP-74043");
 
         // No match on a non-ticket branch.
         assert!(!cfg.tickets.pattern.is_match("main"));
