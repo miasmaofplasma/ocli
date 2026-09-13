@@ -60,12 +60,12 @@ impl Context {
                 error = %error,
                 "no git repository; continuing without git context"
             );
+            // No repo → no identity: `repo_name: None` is the marker
+            // `list` uses to skip repo filtering (an invented identity
+            // would silently hide every note).
             GitContext {
                 branch: None,
-                repo_name: git_start
-                    .file_name()
-                    .map(|n| n.to_string_lossy().into_owned())
-                    .unwrap_or_else(|| "unknown".to_string()),
+                repo_name: None,
             }
         });
 
@@ -221,8 +221,8 @@ mod tests {
         let git = ctx.git();
         assert_eq!(git.branch, None);
         assert_eq!(
-            git.repo_name,
-            dir.path().file_name().unwrap().to_string_lossy()
+            git.repo_name, None,
+            "no repo → no identity: list must not filter by an invented one"
         );
     }
 
@@ -269,7 +269,8 @@ mod tests {
         let git = ctx.git();
         assert_eq!(git.branch.as_deref(), Some("BCP-74043-work"));
         assert_eq!(
-            git.repo_name, "repo",
+            git.repo_name,
+            Some("repo".to_string()),
             "no origin → folder-basename fallback"
         );
     }

@@ -27,9 +27,12 @@ impl GitRepo {
     }
 
     pub fn context(&self) -> Result<GitContext, GitError> {
+        // Real repositories always have an identity (origin's name, or
+        // the folder-basename fallback) — `Some` is unconditional here;
+        // `None` is the degraded no-repo snapshot's in `Context::new`.
         Ok(GitContext {
             branch: self.branch()?,
-            repo_name: self.repo_name(),
+            repo_name: Some(self.repo_name()),
         })
     }
 

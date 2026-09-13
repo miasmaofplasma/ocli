@@ -122,7 +122,9 @@ pub fn run(context: &Context) -> color_eyre::Result<PathBuf> {
             path: template.path().display().to_string(),
         })?;
     let inner = frontmatter::inner_yaml(document.get(fm_span));
-    let repo_name = repo.clone().unwrap_or_else(|| git.repo_name.clone());
+    let repo_name = repo
+        .clone()
+        .unwrap_or_else(|| git.repo_name.clone().unwrap_or_else(|| "unknown".into()));
     let inner = frontmatter::set_or_append_field(inner, "repo", Field::Olink(repo_name))?;
     let inner = match description {
         Some(desc) => {

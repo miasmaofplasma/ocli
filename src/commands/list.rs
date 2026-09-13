@@ -38,20 +38,20 @@ impl Row {
             id: note.name().to_string(),
             description: fm.and_then(|f| f.description.clone()),
             status: fm.and_then(|f| f.status.clone()),
-            repo: fm.and_then(|f| f.repo.clone()),
+            // The bare repo name — the raw field is `[[name]]` on
+            // ocli-created notes; the view normalizes (same helper the
+            // repo filter uses).
+            repo: note_repo(note).map(str::to_string),
         }
     }
 }
 
 #[instrument(skip(context))]
 pub fn run(context: &Context) -> color_eyre::Result<Vec<Row>> {
-    let cli::Command::List {
-        all_repos: _all_repos,
-        status,
-    } = &context.cli().command
-    else {
+    let cli::Command::List { all_repos, status } = &context.cli().command else {
         return Err(eyre!("list command incorrectly called"));
     };
+    let status = status.clone();
 
     let feature_notes_path = context.features_path();
     let note_paths = vault::features::feature_note_paths(&feature_notes_path)?;
@@ -66,11 +66,19 @@ pub fn run(context: &Context) -> color_eyre::Result<Vec<Row>> {
         })
         .collect();
 
-    // TODO for now returning all repos no matter the value
-    // filter note by status
+    // Repo filter (D13): the current repo's tickets only, `--all-repos`
+    // widens. Outside a repository there is no identity to filter by —
+    // the degraded snapshot carries `repo_name: None`, and filtering by
+    // an invented name would silently hide every note, so the vault's
+    // whole listing shows (same as `--all-repos`).
+    let repo_name = (!all_repos)
+        .then(|| context.git().repo_name.clone())
+        .flatten();
+
     let rows: Vec<Row> = notes
         .iter()
-        .filter(|n| note_matches_status(n, status))
+        .filter(|n| note_matches_status(n, &status))
+        .filter(|n| note_matches_repo(n, repo_name.as_deref()))
         .map(Row::new)
         .collect();
 
@@ -83,4 +91,21 @@ fn note_matches_status(note: &Note, status: &Option<String>) -> bool {
     };
 
     note.frontmatter().and_then(|f| f.status.as_deref()) == Some(status)
+}
+
+/// The repo a note belongs to: its `repo` field with ocli's olink wrapper
+/// stripped — `[[name]]` (what `new` writes) and bare `name` (what
+/// hand-written notes carry) name the same repository.
+fn note_repo(note: &Note) -> Option<&str> {
+    note.frontmatter()
+        .and_then(|f| f.repo.as_deref())
+        .map(|repo| repo.trim_start_matches('[').trim_end_matches(']'))
+}
+
+fn note_matches_repo(note: &Note, repo_name: Option<&str>) -> bool {
+    let Some(repo_name) = repo_name else {
+        return true;
+    };
+
+    note_repo(note) == Some(repo_name)
 }

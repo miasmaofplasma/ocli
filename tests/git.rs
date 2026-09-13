@@ -19,7 +19,11 @@ fn discovers_branch_and_repo_name_from_origin() {
 
     let ctx = context(&repo_dir).unwrap();
     assert_eq!(ctx.branch.as_deref(), Some("BCP-74043-fix-login"));
-    assert_eq!(ctx.repo_name, "connected-module-item-api");
+    assert_eq!(
+        ctx.repo_name.as_deref(),
+        Some("connected-module-item-api"),
+        "origin's URL names the repo (D13)"
+    );
 }
 
 #[test]
@@ -28,8 +32,10 @@ fn repo_name_falls_back_to_folder_basename() {
     let repo_dir = temp.path().join("vault-repo");
     std::fs::create_dir(&repo_dir).unwrap();
     common::run_git(&repo_dir, &["init", "-q", "-b", "main"]);
-
-    assert_eq!(context(&repo_dir).unwrap().repo_name, "vault-repo");
+    assert_eq!(
+        context(&repo_dir).unwrap().repo_name.as_deref(),
+        Some("vault-repo")
+    );
 }
 
 #[test]

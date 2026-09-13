@@ -25,8 +25,10 @@ pub struct GitContext {
     pub branch: Option<String>,
     /// Repo identity (D13): last path segment of origin's fetch URL with
     /// the `.git` suffix stripped; falls back to the workdir folder
-    /// basename when `origin` is missing or unreadable.
-    pub repo_name: String,
+    /// basename when `origin` is missing or unreadable. `None` only in
+    /// the degraded no-repository snapshot (D35) — there is no identity
+    /// to have, and `list` must not filter by an invented one.
+    pub repo_name: Option<String>,
 }
 
 #[derive(Debug, Error)]
