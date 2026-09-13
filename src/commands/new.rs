@@ -21,6 +21,14 @@ use crate::{
     },
 };
 
+/// The status every created note starts with (user decision 2026-09-12,
+/// amending the "template encodes initial state" stance): work starts the
+/// moment the note exists. Part of the status vocabulary
+/// (`Backlog`/`In Progress`/`In Review`/`Complete`/`Blocked`) that
+/// Phase 6's `status` command will validate — one constant until that
+/// vocabulary gets a home.
+pub const INITIAL_STATUS: &str = "In Progress";
+
 /// Creates the note and returns its path — the command's data, which
 /// `main` prints to stdout (D26: data → stdout, warnings → stderr).
 #[instrument(skip(context))]
@@ -101,12 +109,12 @@ pub fn run(context: &Context) -> color_eyre::Result<PathBuf> {
     let template = FeatureTemplate::load(&template_path)?;
     let now = Local::now();
     let text = template.render(&values, &now)?;
-
-    // (s3, steps 8–9) Fills: post-render surgical edits on the inner
+    // (s3, steps 8–9c) Fills: post-render surgical edits on the inner
     // frontmatter — `repo` always (D13, `--repo` overrides the git
     // snapshot's repo name), `description` only with `--description`
-    // (D24). A missing field warns and appends: the template is the drift
-    // source, not the user.
+    // (D24), `status` always ([`INITIAL_STATUS`]; `done: false` already
+    // matches — the note is not `Complete`). A missing field warns and
+    // appends: the template is the drift source, not the user.
     let document = markdown::parse(&text);
     let fm_span = document
         .frontmatter()
@@ -122,6 +130,8 @@ pub fn run(context: &Context) -> color_eyre::Result<PathBuf> {
         }
         None => inner,
     };
+    let inner =
+        frontmatter::set_or_append_field(&inner, "status", Field::Str(INITIAL_STATUS.into()))?;
     let text = frontmatter::splice_inner(&text, fm_span, &inner);
 
     // (s4, step 10) Sanity check: the rendered frontmatter must parse as

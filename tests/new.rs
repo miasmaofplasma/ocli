@@ -39,6 +39,14 @@ fn creates_the_note_from_branch_and_repo() -> color_eyre::eyre::Result<()> {
         text.contains("repo: \"[[connected-module-item-api]]\""),
         "repo fill (D13): olink from the origin's name"
     );
+    assert!(
+        text.contains("status: \"In Progress\""),
+        "every created note starts In Progress"
+    );
+    assert!(
+        text.contains("done: false"),
+        "the initial status is consistent with the template's done flag"
+    );
     assert!(!text.contains("{{"), "no placeholder survives");
     assert!(text.contains("## Progress"), "D19 sections pre-seeded");
     assert!(
@@ -226,8 +234,8 @@ fn missing_fill_field_appends_with_a_warning() -> color_eyre::eyre::Result<()> {
     let repo_temp = tempfile::tempdir()?;
     let repo = common::fixture_repo(repo_temp.path(), "NGP-500-fix-login", Some(ORIGIN));
     let vault = TestVault::fixture_with_git(&["new", "--description", "Add SSO"], &repo)?;
-    // A template with no description field (repo stays — it's filled too,
-    // both go through warn-and-append here).
+    // A template with none of the fill targets (repo, description, status):
+    // all three go through warn-and-append here.
     std::fs::write(
         vault
             .context
@@ -235,20 +243,23 @@ fn missing_fill_field_appends_with_a_warning() -> color_eyre::eyre::Result<()> {
             .vault
             .root
             .join("templates/Feature.md"),
-        "---\nstatus: Backlog\n---\nbody\n",
+        "---\nepic:\n---\nbody\n",
     )?;
 
     let path = new::run(&vault.context)?;
     let text = std::fs::read_to_string(&path)?;
     assert!(
-        text.starts_with("---\nstatus: Backlog\n"),
-        "the body stays verbatim"
+        text.starts_with("---\nepic:\n"),
+        "untouched fields stay first"
     );
     assert!(text.contains("---\nbody"), "delimiters stay in place");
     assert!(
-        text.contains("status: Backlog\nrepo:"),
+        text.contains("epic:\nrepo:"),
         "appends land inside the frontmatter, before the closing delimiter"
     );
+    assert!(text.contains("repo: \"[[connected-module-item-api]]\"\n"));
+    assert!(text.contains("description: \"Add SSO\"\n"));
+    assert!(text.contains("status: \"In Progress\"\n"));
     Ok(())
 }
 
