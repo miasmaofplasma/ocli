@@ -1,5 +1,6 @@
 use std::path::PathBuf;
 
+use crate::status::Status;
 use clap::{Parser, Subcommand};
 
 #[derive(Debug, Subcommand)]
@@ -8,7 +9,7 @@ pub enum Command {
         #[arg(long, default_value_t = false)]
         all_repos: bool,
         #[arg(long)]
-        status: Option<String>,
+        status: Option<Status>,
     },
     New {
         /// Explicit ticket key; overrides the branch-derived id (D25).

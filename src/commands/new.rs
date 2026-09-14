@@ -43,27 +43,24 @@ pub fn run(context: &Context) -> color_eyre::Result<PathBuf> {
         return Err(eyre!("new command incorrectly called"));
     };
 
-    // (s1, step 1–2) Branch check — the D20b hard require: `new` refuses
-    // off-pattern branches because a misfiled note is the expensive
-    // mistake. Unborn branches are fine: the name exists, and the
-    // captures need no commit. One regex pass feeds both the value map
-    // and the id composition.
-    let git = context.git();
-    let Some(branch) = git.branch.as_deref() else {
-        return Err(vault::VaultError::CurrentBranchNotFound.into());
-    };
+    // (s1, steps 1–3) Branch check + captures — the D20b hard require:
+    // `new` refuses off-pattern branches because a misfiled note is the
+    // expensive mistake. Unborn branches are fine: the name exists, and
+    // the captures need no commit. One regex pass feeds both the value
+    // map and the id composition; shared with `open` (D27: orchestration
+    // lives in commands).
+    let (branch, caps) = super::current_ticket(context)?;
     let tickets = &context.config().tickets;
-    let caps = vault::branch_captures(branch, &tickets.pattern)?;
 
     // (s1, step 3) The id: composed from the captures; an explicit key
     // wins, with the D20c case-insensitive mismatch warning.
-    let composed = vault::note_name(branch, &tickets.pattern, &caps, &tickets.id)?;
+    let composed = vault::note_name(&branch, &tickets.pattern, &caps, &tickets.id)?;
     let id = match key {
         Some(explicit) => {
             // The filename-safety gate is machinery, not convention — it
             // applies to the explicit key exactly as to the composed id:
             // `ocli new ../evil` must not escape features/.
-            vault::ensure_safe_note_name(branch, explicit)?;
+            vault::ensure_safe_note_name(&branch, explicit)?;
             if !explicit.eq_ignore_ascii_case(&composed) {
                 tracing::warn!(
                     branch_id = %composed,
@@ -109,6 +106,7 @@ pub fn run(context: &Context) -> color_eyre::Result<PathBuf> {
     let template = FeatureTemplate::load(&template_path)?;
     let now = Local::now();
     let text = template.render(&values, &now)?;
+    let git = context.git();
     // (s3, steps 8–9c) Fills: post-render surgical edits on the inner
     // frontmatter — `repo` always (D13, `--repo` overrides the git
     // snapshot's repo name), `description` only with `--description`

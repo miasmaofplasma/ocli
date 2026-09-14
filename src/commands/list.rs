@@ -6,13 +6,14 @@ use tracing::instrument;
 use crate::{
     cli,
     context::Context,
+    status::Status,
     vault::{self, note::Note},
 };
 
 pub struct Row {
     pub id: String,
     pub description: Option<String>,
-    pub status: Option<String>,
+    pub status: Option<Status>,
     pub repo: Option<String>,
 }
 
@@ -25,7 +26,13 @@ impl Display for Row {
             self.description.as_deref().unwrap_or("-")
         )?;
 
-        writeln!(f, "status: {}", self.status.as_deref().unwrap_or("-"))?;
+        writeln!(
+            f,
+            "status: {}",
+            self.status
+                .map(|s| s.to_string())
+                .unwrap_or("-".to_string())
+        )?;
         writeln!(f, "repository: {}", self.repo.as_deref().unwrap_or("-"))?;
         Ok(())
     }
@@ -37,7 +44,7 @@ impl Row {
         Self {
             id: note.name().to_string(),
             description: fm.and_then(|f| f.description.clone()),
-            status: fm.and_then(|f| f.status.clone()),
+            status: fm.and_then(|f| f.status),
             // The bare repo name — the raw field is `[[name]]` on
             // ocli-created notes; the view normalizes (same helper the
             // repo filter uses).
@@ -51,7 +58,7 @@ pub fn run(context: &Context) -> color_eyre::Result<Vec<Row>> {
     let cli::Command::List { all_repos, status } = &context.cli().command else {
         return Err(eyre!("list command incorrectly called"));
     };
-    let status = status.clone();
+    let status = *status;
 
     let feature_notes_path = context.features_path();
     let note_paths = vault::features::feature_note_paths(&feature_notes_path)?;
@@ -85,12 +92,12 @@ pub fn run(context: &Context) -> color_eyre::Result<Vec<Row>> {
     Ok(rows)
 }
 
-fn note_matches_status(note: &Note, status: &Option<String>) -> bool {
+fn note_matches_status(note: &Note, status: &Option<Status>) -> bool {
     let Some(status) = status else {
         return true;
     };
 
-    note.frontmatter().and_then(|f| f.status.as_deref()) == Some(status)
+    note.frontmatter().and_then(|f| f.status.as_ref()) == Some(status)
 }
 
 /// The repo a note belongs to: its `repo` field with ocli's olink wrapper

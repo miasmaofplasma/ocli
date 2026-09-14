@@ -1,5 +1,5 @@
 use clap::Parser;
-use color_eyre::eyre::{Result, WrapErr, bail};
+use color_eyre::eyre::{Result, WrapErr};
 use ocli::{cli::Cli, config::Config, context::Context};
 use tracing_subscriber::EnvFilter;
 
@@ -25,7 +25,7 @@ fn main() -> Result<()> {
             let path = ocli::commands::new::run(&context)?;
             println!("{}", path.display());
         }
-        ocli::cli::Command::Open => bail!("not implemented"),
+        ocli::cli::Command::Open => ocli::commands::open::run(&context)?,
     };
 
     Ok(())

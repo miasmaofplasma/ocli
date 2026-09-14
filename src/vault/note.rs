@@ -80,6 +80,7 @@ impl Note {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::status::Status;
     use crate::vault::error_chain;
 
     fn write_note(dir: &Path, name: &str, contents: &str) -> std::path::PathBuf {
@@ -99,7 +100,7 @@ mod tests {
         let note = Note::load(&path).unwrap();
         assert_eq!(note.name(), "BCP-74043");
         let fm = note.frontmatter().unwrap();
-        assert_eq!(fm.status.as_deref(), Some("In Progress"));
+        assert_eq!(fm.status, Some(Status::InProgress));
         assert_eq!(fm.done, Some(false));
     }
 
@@ -114,8 +115,8 @@ mod tests {
         );
         let note = Note::load(&path).unwrap();
         assert_eq!(
-            note.frontmatter().unwrap().status.as_deref(),
-            Some("In Review")
+            note.frontmatter().unwrap().status,
+            Some(Status::InReview)
         );
     }
 
@@ -125,8 +126,8 @@ mod tests {
         let path = write_note(dir.path(), "X-1.md", "---\nstatus: Complete\n---");
         let note = Note::load(&path).unwrap();
         assert_eq!(
-            note.frontmatter().unwrap().status.as_deref(),
-            Some("Complete")
+            note.frontmatter().unwrap().status,
+            Some(Status::Complete)
         );
     }
 

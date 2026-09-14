@@ -6,8 +6,10 @@
 
 mod common;
 
+use clap::Parser;
 use common::TestVault;
 use ocli::commands::list;
+use ocli::status::Status;
 
 const ORIGIN: &str = "https://host/org/connected-module-item-api.git";
 
@@ -29,7 +31,7 @@ fn lists_fixture_notes_skipping_malformed() -> color_eyre::eyre::Result<()> {
         bcp.description.as_deref(),
         Some("Add SSO to the settings page")
     );
-    assert_eq!(bcp.status.as_deref(), Some("In Progress"));
+    assert_eq!(bcp.status, Some(Status::InProgress));
     assert_eq!(bcp.repo.as_deref(), Some("connected-module-item-api"));
 
     let ngp = &rows[1];
@@ -37,7 +39,7 @@ fn lists_fixture_notes_skipping_malformed() -> color_eyre::eyre::Result<()> {
         ngp.description, None,
         "no title fallback (D24): an empty description stays empty"
     );
-    assert_eq!(ngp.status.as_deref(), Some("Complete"));
+    assert_eq!(ngp.status, Some(Status::Complete));
 
     Ok(())
 }
@@ -54,16 +56,12 @@ fn status_filter_matches_exactly() -> color_eyre::eyre::Result<()> {
 }
 
 #[test]
-fn status_filter_is_case_sensitive() -> color_eyre::eyre::Result<()> {
-    let vault = TestVault::fixture(&["list", "--status", "in progress"])?;
-    let rows = list::run(&vault.context)?;
-
-    assert!(
-        rows.is_empty(),
-        "exact match, no case folding: a near-miss status yields nothing"
-    );
-
-    Ok(())
+fn unknown_status_arg_is_rejected() {
+    // `--status` is a typed Status now: a near-miss no longer silently
+    // yields an empty list — clap refuses it before any note is read.
+    let err = ocli::cli::Cli::try_parse_from(["ocli", "list", "--status", "in progresss"])
+        .expect_err("near-miss status should be a usage error");
+    assert!(err.to_string().contains("unknown status"), "got: {err}");
 }
 
 #[test]

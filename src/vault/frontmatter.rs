@@ -6,6 +6,7 @@ use serde::Deserialize;
 use crate::vault::error_chain;
 use crate::{
     ftypes::Field,
+    status::Status,
     vault::{VaultError, markdown::Span},
 };
 
@@ -15,7 +16,7 @@ use crate::{
 #[derive(Debug, Deserialize, PartialEq)]
 pub struct Frontmatter {
     pub description: Option<String>,
-    pub status: Option<String>,
+    pub status: Option<Status>,
     pub repo: Option<String>,
     pub done: Option<bool>,
 }
@@ -301,12 +302,14 @@ mod tests {
 
     #[test]
     fn empty_value_is_none_but_quoted_empty_is_some() {
-        let fm = deserialize_frontmatter("status:\n").unwrap();
-        assert_eq!(fm.status, None, "YAML null → None");
+        // Null vs empty-string is a String-field property; status is now
+        // a closed enum, so this exercises `description` instead.
+        let fm = deserialize_frontmatter("description:\n").unwrap();
+        assert_eq!(fm.description, None, "YAML null → None");
 
-        let fm = deserialize_frontmatter("status: \"\"\n").unwrap();
+        let fm = deserialize_frontmatter("description: \"\"\n").unwrap();
         assert_eq!(
-            fm.status,
+            fm.description,
             Some(String::new()),
             "quoted empty is a real value"
         );
@@ -314,8 +317,17 @@ mod tests {
 
     #[test]
     fn plain_scalar_coerces_to_string() {
-        let fm = deserialize_frontmatter("status: 42\n").unwrap();
-        assert_eq!(fm.status, Some("42".to_string()));
+        // Same coercion, on the still-String `description` field.
+        let fm = deserialize_frontmatter("description: 42\n").unwrap();
+        assert_eq!(fm.description, Some("42".to_string()));
+    }
+
+    #[test]
+    fn unknown_status_word_is_an_error() {
+        // A scalar outside the Status vocabulary fails the whole load,
+        // so `list` warns-and-skips the note (D26) rather than guessing.
+        let err = deserialize_frontmatter("status: banana\n").unwrap_err();
+        assert!(error_chain(&err).contains("banana"), "got: {err}");
     }
 
     #[test]
@@ -349,7 +361,7 @@ mod tests {
             fm,
             Frontmatter {
                 description: None,
-                status: Some("In Progress".to_string()),
+                status: Some(Status::InProgress),
                 repo: None,
                 done: None,
             }
