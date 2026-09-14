@@ -30,8 +30,9 @@ impl Display for Row {
             f,
             "status: {}",
             self.status
+                .as_ref()
                 .map(|s| s.to_string())
-                .unwrap_or("-".to_string())
+                .unwrap_or_else(|| "-".to_string())
         )?;
         writeln!(f, "repository: {}", self.repo.as_deref().unwrap_or("-"))?;
         Ok(())
@@ -44,7 +45,7 @@ impl Row {
         Self {
             id: note.name().to_string(),
             description: fm.and_then(|f| f.description.clone()),
-            status: fm.and_then(|f| f.status),
+            status: fm.and_then(|f| f.status.clone()),
             // The bare repo name — the raw field is `[[name]]` on
             // ocli-created notes; the view normalizes (same helper the
             // repo filter uses).
@@ -58,8 +59,6 @@ pub fn run(context: &Context) -> color_eyre::Result<Vec<Row>> {
     let cli::Command::List { all_repos, status } = &context.cli().command else {
         return Err(eyre!("list command incorrectly called"));
     };
-    let status = *status;
-
     let feature_notes_path = context.features_path();
     let note_paths = vault::features::feature_note_paths(&feature_notes_path)?;
     let notes: Vec<Note> = note_paths
@@ -84,7 +83,7 @@ pub fn run(context: &Context) -> color_eyre::Result<Vec<Row>> {
 
     let rows: Vec<Row> = notes
         .iter()
-        .filter(|n| note_matches_status(n, &status))
+        .filter(|n| note_matches_status(n, status))
         .filter(|n| note_matches_repo(n, repo_name.as_deref()))
         .map(Row::new)
         .collect();

@@ -1,6 +1,6 @@
 use std::path::PathBuf;
 
-use crate::status::Status;
+use crate::status::{Status, parse_strict};
 use clap::{Parser, Subcommand};
 
 #[derive(Debug, Subcommand)]
@@ -8,7 +8,7 @@ pub enum Command {
     List {
         #[arg(long, default_value_t = false)]
         all_repos: bool,
-        #[arg(long)]
+        #[arg(long, value_parser = parse_strict)]
         status: Option<Status>,
     },
     New {

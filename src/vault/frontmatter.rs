@@ -323,11 +323,12 @@ mod tests {
     }
 
     #[test]
-    fn unknown_status_word_is_an_error() {
-        // A scalar outside the Status vocabulary fails the whole load,
-        // so `list` warns-and-skips the note (D26) rather than guessing.
-        let err = deserialize_frontmatter("status: banana\n").unwrap_err();
-        assert!(error_chain(&err).contains("banana"), "got: {err}");
+    fn unknown_status_word_becomes_unknown() {
+        // The read projection is faithful: a status outside the vocabulary
+        // loads as `Unknown`, not a load failure (write contract: "read
+        // anything"). `list` shows it verbatim; only `--status` rejects it.
+        let fm = deserialize_frontmatter("status: banana\n").unwrap();
+        assert_eq!(fm.status, Some(Status::Unknown("banana".to_string())));
     }
 
     #[test]
