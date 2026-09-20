@@ -91,11 +91,11 @@
         "rust-overlay": "rust-overlay"
       },
       "locked": {
-        "lastModified": 1789930968,
-        "narHash": "sha256-CySx683IjZDfMQsXT+5W1h1ivPim+CTioSzy8xCYIng=",
+        "lastModified": 1789932104,
+        "narHash": "sha256-HZz1yz8q3sGsrpfOHpbnfW4dVxGbm3bE08H9fYgvIHA=",
         "owner": "miasmaofplasma",
         "repo": "ocli",
-        "rev": "3ccba60070ef3af1ddd48a54cbcaf7f0f64b0679",
+        "rev": "316d3a7c250583ce168113315b47d72646ae3299",
         "type": "github"
       },
       "original": {
