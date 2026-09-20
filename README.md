@@ -1,20 +1,26 @@
 # ocli
 
-A terminal-native CLI for managing work-ticket notes in an Obsidian vault, written in Rust as a learning project.
+A terminal-native CLI for managing work-ticket notes in an Obsidian vault, written in Rust as a learning project that I would actually use.
+
+## My current Obsidian workflow
+- I have feature tickets living in <vault>/features/<feature>.md.  I use these notes extensivly for tracking progress, descisions, notes, and design while working on features.
+- I have a Feature template note living in <vault>/templates/Feature.md
+- I name my branches based on the features that are tracket in Jira.  The format I for my branch is always <FeatureType>-<TicketNumber>-<some-description>.
+- When creating my feature notes in Obsidian, I use the QuickAdd plugin to fill out these details into my Feature template.
+- When adding notes, I have to switch to my obsidian vault, add the note manually and continue.
 
 ## Why
-
-Workflow today: engineering work happens in the terminal; progress tracking, decisions, and product-bound questions live in Obsidian feature notes. Switching contexts to update a note breaks flow. `ocli` closes that gap: from inside a work repo on branch `BCP-74043-something`, the tool already knows which ticket you're on.
+Having to switch context to Obsidian in the middle of working in my terminal can break the flow of my coding process.  
+A lot of times I just want to add a quick note or change the status in frontmatter and that requires me to go to Obsidain, hunt down the particular note that I'm working on, and make the update.
+So instead, I decided to automate the process.  The current "context" of what note I'm working on is derived from the current branch that I'm on in git.  If I'm in the branch XXX-12345-fix-that-bug, then the note that I will be working on in Obsidian should be called XXX-12345.md (configurable).  
+The `ocli` cli can create new notes (from template), edit frontmatter, add notes in particular sections (configurable) straight from the command line without me having to type in what note I'm working on every time I want to make an edit.
 
 ## How it works
-
-- **The vault is the database.** `ocli` reads and writes the markdown files directly. No Obsidian app, no API, no sync service. Notes remain fully valid Obsidian documents (frontmatter, wikilinks, and plugin blocks render unchanged).
-- **Tickets are files.** A ticket is `features/<KEY>-<ID>.md` in the vault (e.g. `features/BCP-74043.md`). Listing tickets means listing the directory.
+- **The vault is the database.** `ocli` reads and writes the markdown files directly. No Obsidian app, no API, no sync service. Notes remain fully valid Obsidian documents.
+- **Tickets are files.** A ticket is `features/<KEY>-<ID>.md` in the vault (e.g. `features/XXX-74043.md`). Listing tickets means listing the directory.
 - **Git is the context.** The current branch must match a configurable regex whose named captures (e.g. `FeatureType`, `TicketNumber`) feed the template; the origin remote maps to the `repo` frontmatter field. Commands infer the ticket from where you are, with an explicit `--ticket` override.
 
 ### Write contract
-
-The vault is shared with Obsidian and the Meta Bind plugin, so `ocli` is conservative:
 
 - **Reads** anything: frontmatter, body, directory listings.
 - **Writes** only two things:
