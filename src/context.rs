@@ -99,7 +99,7 @@ mod tests {
     use regex::Regex;
 
     use super::*;
-    use crate::config::{FrontmatterCfg, ResolvedVault, SectionsCfg, TemplateCfg, Tickets};
+    use crate::config::{FrontmatterCfg, ResolvedVault, TemplateCfg, Tickets};
 
     /// A minimal valid `Config` pointing at `root` — built directly, since
     /// config validation is deliberately filesystem-free.
@@ -119,7 +119,7 @@ mod tests {
                 pattern: Regex::new(r"^(?<Key>[A-Z]+)-(?<Num>\d+)").unwrap(),
                 id: "{Key}-{Num}".to_string(),
             },
-            sections: SectionsCfg::default(),
+            sections: BTreeMap::new(),
         }
     }
 

@@ -45,6 +45,8 @@ impl std::ops::Index<Span> for str {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Section {
     pub name: String,
+    /// Heading depth: 1–6, the count of leading `#`.
+    pub level: usize,
     pub content: Span,
 }
 
@@ -52,6 +54,7 @@ pub struct Section {
 /// (or end of text). Never escapes `parse`.
 struct TempSection {
     name: String,
+    level: usize,
     start: usize,
 }
 
@@ -125,6 +128,7 @@ pub fn parse(text: &str) -> Document<'_> {
                 if let Some(prev) = current.take() {
                     sections.push(Section {
                         name: prev.name,
+                        level: prev.level,
                         content: Span {
                             start: prev.start,
                             end: offset,
@@ -148,6 +152,7 @@ pub fn parse(text: &str) -> Document<'_> {
                     if let Some(prev) = current.take() {
                         sections.push(Section {
                             name: prev.name,
+                            level: prev.level,
                             content: Span {
                                 start: prev.start,
                                 end: offset,
@@ -156,6 +161,7 @@ pub fn parse(text: &str) -> Document<'_> {
                     }
                     current = Some(TempSection {
                         name: rest.trim().to_string(),
+                        level: hashes,
                         start: offset,
                     });
                 }
@@ -171,6 +177,7 @@ pub fn parse(text: &str) -> Document<'_> {
     if let Some(prev) = current.take() {
         sections.push(Section {
             name: prev.name,
+            level: prev.level,
             content: Span {
                 start: prev.start,
                 end: text.len(),

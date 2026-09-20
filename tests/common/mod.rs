@@ -39,6 +39,26 @@ impl TestVault {
         Self::build_with(temp, args, repo_dir)
     }
 
+    /// Fixture vault + git discovery + a custom `[sections]` map — the
+    /// `section` command has no default sections (D19).
+    pub fn fixture_with_sections(
+        args: &[&str],
+        repo_dir: &std::path::Path,
+        sections: std::collections::BTreeMap<String, ocli::config::SectionSpec>,
+    ) -> color_eyre::eyre::Result<Self> {
+        let temp = tempfile::tempdir().wrap_err("creating temp dir")?;
+        copy_dir(&fixture_root(), temp.path())?;
+        let mut config = Config::for_vault(temp.path().to_path_buf())?;
+        config.sections = sections;
+        let cli = Cli::parse_from(std::iter::once("ocli").chain(args.iter().copied()));
+        let context =
+            Context::new(config, cli, repo_dir).map_err(color_eyre::eyre::Report::new)?;
+        Ok(Self {
+            _temp: temp,
+            context,
+        })
+    }
+
     /// An empty vault: root and `notes/features` exist, no notes inside.
     pub fn empty(args: &[&str]) -> color_eyre::eyre::Result<Self> {
         let temp = tempfile::tempdir().wrap_err("creating temp dir")?;

@@ -22,11 +22,6 @@ pub const DEFAULT_IGNORE: &[&str] = &["relates-to", "blocked-by"];
 pub const DEFAULT_BRANCH_PATTERN: &str = r"^(?<FeatureType>[A-Z]+)-(?<TicketNumber>\d+)";
 pub const DEFAULT_ID_TEMPLATE: &str = "{FeatureType}-{TicketNumber}";
 
-/// Default CLI-owned `##` section names (D19).
-pub const DEFAULT_SECTION_PROGRESS: &str = "Progress";
-pub const DEFAULT_SECTION_NOTES: &str = "Notes";
-pub const DEFAULT_SECTION_DECISIONS: &str = "Decisions";
-pub const DEFAULT_SECTION_QUESTIONS: &str = "Open Questions";
 /// Default QuickAdd template path, relative to the vault root (D12/D22).
 pub const DEFAULT_TEMPLATE_PATH: &str = "templates/Feature.md";
 
@@ -137,13 +132,25 @@ impl Default for TicketCfg {
     }
 }
 
-#[derive(Debug, Deserialize)]
-#[serde(default)]
-pub struct SectionsCfg {
-    pub progress: String,
-    pub notes: String,
-    pub decisions: String,
-    pub questions: String,
+/// A CLI-owned section (D19): the full heading line (marker included, so
+/// any `#` level) and the entry format the `section` command appends.
+#[derive(Debug, Clone, Deserialize)]
+pub struct SectionSpec {
+    /// The heading line verbatim: `## Open Questions`, `### Todo`, …
+    pub heading: String,
+    #[serde(default)]
+    pub format: SectionFormat,
+}
+
+/// How `section <key> add` renders an entry (D19).
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Deserialize, Default)]
+#[serde(rename_all = "lowercase")]
+pub enum SectionFormat {
+    /// `- YYYY-MM-DD HH:mm — text`
+    #[default]
+    Log,
+    /// `- [ ] text`
+    List,
 }
 
 impl Default for FrontmatterCfg {
@@ -151,17 +158,6 @@ impl Default for FrontmatterCfg {
         Self {
             ignore: default_ignore(),
             types: BTreeMap::new(),
-        }
-    }
-}
-
-impl Default for SectionsCfg {
-    fn default() -> Self {
-        Self {
-            progress: DEFAULT_SECTION_PROGRESS.into(),
-            notes: DEFAULT_SECTION_NOTES.into(),
-            decisions: DEFAULT_SECTION_DECISIONS.into(),
-            questions: DEFAULT_SECTION_QUESTIONS.into(),
         }
     }
 }
@@ -177,7 +173,7 @@ struct ConfigFile {
     #[serde(default)]
     tickets: TicketCfg,
     #[serde(default)]
-    sections: SectionsCfg,
+    sections: BTreeMap<String, SectionSpec>,
 }
 
 fn default_features_dir() -> PathBuf {
@@ -228,7 +224,7 @@ pub struct Config {
     pub frontmatter: FrontmatterCfg,
     pub template: TemplateCfg,
     pub tickets: Tickets,
-    pub sections: SectionsCfg,
+    pub sections: BTreeMap<String, SectionSpec>,
 }
 
 /// Compiled ticket config (D20/D25): regex compiled once, id template
@@ -466,10 +462,10 @@ mod tests {
         id = '{Key}-{Num}'
 
         [sections]
-        progress = "Log"
-        notes = "Scratch"
-        decisions = "Calls"
-        questions = "Qs"
+        progress = { heading = '## Log' }
+        notes = { heading = '## Scratch' }
+        decisions = { heading = '### Calls' }
+        questions = { heading = '## Qs', format = "list" }
     "#;
 
     /// Minimal config: only the required key.
@@ -500,10 +496,31 @@ mod tests {
         assert_eq!(cfg.tickets.branch_pattern, r"^(?<Key>[A-Z]+)-(?<Num>\d+)-");
         assert_eq!(cfg.tickets.id, "{Key}-{Num}");
 
-        assert_eq!(cfg.sections.progress, "Log");
-        assert_eq!(cfg.sections.notes, "Scratch");
-        assert_eq!(cfg.sections.decisions, "Calls");
-        assert_eq!(cfg.sections.questions, "Qs");
+        assert_eq!(cfg.sections["progress"].heading, "## Log");
+        assert_eq!(cfg.sections["progress"].format, SectionFormat::Log);
+        assert_eq!(cfg.sections["notes"].heading, "## Scratch");
+        assert_eq!(cfg.sections["decisions"].heading, "### Calls");
+        assert_eq!(cfg.sections["questions"].heading, "## Qs");
+        assert_eq!(cfg.sections["questions"].format, SectionFormat::List);
+    }
+
+    /// A user-defined section key parses with heading and format honored —
+    /// the section vocabulary is entirely config-driven (D19).
+    #[test]
+    fn user_defined_section_parses() {
+        let cfg = parse(
+            r#"
+            [vault]
+            root = "/v"
+
+            [sections]
+            todos = { heading = '### Todo', format = "list" }
+        "#,
+        );
+        let todos = cfg.sections.get("todos").expect("user section");
+        assert_eq!(todos.heading, "### Todo");
+        assert_eq!(todos.format, SectionFormat::List);
+        assert_eq!(cfg.sections.len(), 1, "no default sections");
     }
 
     #[test]
@@ -524,10 +541,7 @@ mod tests {
         assert_eq!(cfg.tickets.branch_pattern, DEFAULT_BRANCH_PATTERN);
         assert_eq!(cfg.tickets.id, DEFAULT_ID_TEMPLATE);
 
-        assert_eq!(cfg.sections.progress, DEFAULT_SECTION_PROGRESS);
-        assert_eq!(cfg.sections.notes, DEFAULT_SECTION_NOTES);
-        assert_eq!(cfg.sections.decisions, DEFAULT_SECTION_DECISIONS);
-        assert_eq!(cfg.sections.questions, DEFAULT_SECTION_QUESTIONS);
+        assert!(cfg.sections.is_empty(), "no default sections");
     }
 
     #[test]
@@ -541,11 +555,11 @@ mod tests {
             [frontmatter]
 
             [sections]
-            questions = "Open Items"
+            questions = { heading = '## Open Items' }
         "#,
         );
-        assert_eq!(cfg.sections.questions, "Open Items");
-        assert_eq!(cfg.sections.progress, DEFAULT_SECTION_PROGRESS);
+        assert_eq!(cfg.sections["questions"].heading, "## Open Items");
+        assert_eq!(cfg.sections.len(), 1, "only questions is defined");
 
         // [tickets] with only a pattern: id defaults.
         let cfg2: ConfigFile = toml::from_str(
@@ -785,7 +799,7 @@ mod tests {
         .unwrap();
         let cfg = Config::load_from(ConfigSource::Default, &path, None, None).unwrap();
         assert_eq!(cfg.vault.root, dir.path());
-        assert_eq!(cfg.sections.progress, DEFAULT_SECTION_PROGRESS);
+        assert!(cfg.sections.is_empty());
         assert_eq!(cfg.template.path, PathBuf::from(DEFAULT_TEMPLATE_PATH));
         assert!(cfg.template.values.is_empty());
     }

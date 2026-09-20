@@ -2,6 +2,7 @@ pub mod fm;
 pub mod list;
 pub mod new;
 pub mod open;
+pub mod section;
 pub mod status;
 
 use std::path::PathBuf;

@@ -8,27 +8,22 @@ Rules for this file:
 - Decisions here are provisional while the phase is live; this file wins over PLAN for phase work. At phase close, durable outcomes are promoted into PLAN.md (new/amended D-entries) and everything else here is deleted — git history is the archive.
 - Keep it short. Details go in code comments and commit messages.
 
-## Goal
+## Where we are
 
-Phase 5 made ocli a reader + creator (`new`). Phase 6 makes it an *editor*: modify an existing note in place without corrupting it. The D11 write path — read → parse to spans → apply edit ops → rebuild with untouched bytes identical → atomic temp+rename → re-read-and-retry on conflict. First consumers: `fm`, `status`, the D19 append commands.
+- **Landed (slices 1–4):** `edit_note` (D11 atomic write + retry), `fm` (typed setter, D16/D18), `status` (vocab + `done:` sync, D37), `section` (config-driven read + append, D19). All four Phase-6 slices done — 167 tests, clippy clean.
 
-## Slices (each ends compiling and tested)
+## `section` — how it landed (D19)
 
-1. **D11 write core — edit ops + atomic write:** one edit-op type (a byte-range splice over the *original* text) applied in a single sorted pass — untouched bytes stay identical (the D11 contract); write via temp file in the same dir + `rename` (atomic; a reader never sees a half-written note); optimistic retry — re-read and re-apply if the note changed under us. Pure `rebuild(text, &ops)` unit-pinned for byte fidelity; write+retry integration-tested on a fixture note. `set_field`/`append_field` already supply the frontmatter field-region splice; this slice is the missing write half of D11.
-2. **`fm` — the general setter (D16/D18):** `ocli fm <field> <value>` — coerce the value per the config `[frontmatter]` type table, refuse managed (`status`/`done`/`Created`/`repo`) and `ignore`-listed fields, strict `set_field` (`FieldNotFound` + closest-key suggestion), empty value empties the field; atomic write from s1. First real command over the machinery.
-3. **`status` — vocabulary + `done:` sync (D16/D37):** `ocli status <Status>` — parse via `parse_strict` (near-miss → exit 2), set `status` to its Display form, sync `done` (`Complete` ⇒ `done: true`, else ⇒ `done: false`). Sets both fields via the s1 primitive directly — it *owns* them, bypassing `fm`'s managed-field refusal (that refusal is for the general setter).
-4. **D19 appends — section entries:** the one genuinely new primitive — locate the configured `##` section (markdown `Document` sections + D8 footer marker) and insert `- YYYY-MM-DD HH:mm — text` after its last entry (`house_format`, D12); create the section at the footer marker (or EOF) when absent. Then the four thin commands `progress` / `note` / `decision` / `question` (questions = `- [ ]` checkboxes) over it.
+- `ocli section <key>` reads the note's section; `ocli section <key> add "text"` appends.
+- Sections are **entirely config-defined, no defaults**: `[sections] <key> = { heading = "## Line", format = "log" | "list" }` — the heading carries its own `#` level, `format` picks timestamped-log vs `- [ ]` checklist.
+- `markdown::Section` now records heading `level` (the parser already counted `#`, now it's kept), so `## X` matches only an h2, `### X` only an h3.
+- New sections insert at the footer marker (D8) or EOF; entries are single-line.
 
-## Already built — reused here, not rebuilt
+## Remaining before Phase 6 close-out
 
-- `set_field` / `append_field` / `set_or_append_field` + the field-region locator (`vault/frontmatter.rs`) — the frontmatter splice unit (D11).
-- `markdown::parse` → `Document` (frontmatter/body/section/footer spans) — the byte-preserving parse (D27).
-- `Field` typed emission (`ftypes.rs`) + the `[frontmatter]` type table (`config.rs`, D18).
-- `house_format` / `DATE_FORMAT` (`vault/template.rs`) — the D19 entry timestamp.
-- `Status` + `parse_strict` (`status.rs`, D37).
+1. **Heading validation at config load** — a malformed `heading` (`#######`, no space, empty) is only caught when the `section` command resolves it; fold into `ConfigFile::validate` for fail-loud at load.
+2. **Close-out** — promote the durable outcomes (D11's multi-edit simplification, D19's config-driven sections, the `section` command) into PLAN and reset this file; tick the Phase 6 checklist item.
 
-## Decisions pending (make each when its slice needs it, not before)
+## Decisions pending
 
-- Conflict detection for the retry: byte-compare vs. mtime; retry bound before a hard error.
-- Where the edit-op list and write live: a new `vault/edit.rs` vs. extending `note.rs`.
-- `fm` value coercion: quote/escape ownership per config type (mostly settled in `ftypes::Field`).
+- Read output: print the heading line verbatim plus its entries (current behavior) — no change expected.

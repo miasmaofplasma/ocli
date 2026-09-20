@@ -19,7 +19,7 @@ The vault is shared with Obsidian and the Meta Bind plugin, so `ocli` is conserv
 - **Reads** anything: frontmatter, body, directory listings.
 - **Writes** only two things:
   1. Frontmatter fields it manages (`status`, `done`, `Created`, `repo`, `owner`) — via surgical line edits; `fm` writes other fields per config types, never `ignore`-listed ones.
-  2. CLI-owned `##` markdown sections it creates on demand (Progress, Notes, Decisions, Open Questions — names from config).
+  2. CLI-owned `##` markdown sections it creates on demand (declared in config `[sections]`).
 - Everything else in a note is never touched — in particular, ocli never writes past the `<!-- ocli:footer -->` footer marker; everything after it is plugin/widget territory (D8).
 
 ## Planned commands (v1)
@@ -30,8 +30,8 @@ The vault is shared with Obsidian and the Meta Bind plugin, so `ocli` is conserv
 | `ocli list [--status S] [--all-repos]` | Scan `features/`, print one block per ticket — id / description / status / repository, `-` for unset values; `--status` filters by a canonical status (a near-miss is a usage error); defaults to the current repo's tickets (D13), `--all-repos` lists everything; outside a repo the whole vault lists |
 | `ocli status <Status>` | Update the inferred ticket's status; keeps `done:` in sync |
 | `ocli fm <field> <value>` | General frontmatter setter — type rules from config, refuses managed and ignored fields |
-| `ocli progress / note / decision / question "<text>"` | Append timestamped entries to the ticket's configured `##` sections |
-| `ocli questions [--all]` | Cross-vault view of unchecked Open Questions entries |
+| `ocli section <key>` | Print the current note's config-defined `##` section (`[sections]`) |
+| `ocli section <key> add "<text>"` | Append an entry to that section (timestamped log, or checklist for `list` sections), creating the section at the footer marker when absent |
 | `ocli open` | Open the current ticket's note in Obsidian (via the `obsidian://` URI scheme; requires the note to exist) |
 
 Status vocabulary: `Backlog → In Progress → In Review → Complete`, plus occasional `Blocked` — validated by `ocli status`, which keeps `done:` in sync with `Complete`. A note whose status isn't in the vocabulary still lists (shown verbatim); `--status`/`status` reject it (D37).
@@ -57,11 +57,9 @@ SprintNumber = "2026.1"
 estimate = "int"
 ignore = ["relates-to", "blocked-by"]
 
-[sections]               # CLI-owned ## sections
-progress  = "Progress"
-notes     = "Notes"
-decisions = "Decisions"
-questions = "Open Questions"
+[sections]               # CLI-owned sections (heading + entry format: log | list)
+questions = { heading = "## Open Questions", format = "list" }
+todos     = { heading = "### Todo", format = "list" }
 
 [tickets]
 branch_pattern = '^(?<FeatureType>[A-Z]+)-(?<TicketNumber>\d+)'

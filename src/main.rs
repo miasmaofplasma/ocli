@@ -28,6 +28,10 @@ fn main() -> Result<()> {
         ocli::cli::Command::Open => ocli::commands::open::run(&context)?,
         ocli::cli::Command::FrontMatter { .. } => ocli::commands::fm::run(&context)?,
         ocli::cli::Command::Status { .. } => ocli::commands::status::run(&context)?,
+        ocli::cli::Command::Section { .. } => {
+            let section = ocli::commands::section::run(&context)?;
+            section.inspect(|section| println!("{section}"));
+        }
     };
 
     Ok(())
