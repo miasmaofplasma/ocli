@@ -14,6 +14,8 @@
     cargo-generate
     dbeaver-bin
     lazygit
+    # The built `ocli` binary, from this repo's flake (devenv.yaml input).
+    inputs.ocli.packages.${pkgs.system}.default
   ];
 
   # https://devenv.sh/languages/
