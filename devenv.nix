@@ -2,7 +2,7 @@
 
 {
   env = {
-    OCLI_CONFIG = "./test-config.toml";
+    # OCLI_CONFIG = "./test-config.toml";
   };
 
   # https://devenv.sh/packages/
