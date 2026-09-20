@@ -49,7 +49,7 @@ impl FromStr for Status {
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         Ok(match s.trim() {
-            "Backlog" => Status::Backlog,
+            "Backlog" | "backlog" => Status::Backlog,
             "In Progress" | "InProgress" | "progress" | "in-progress" => Status::InProgress,
             "In Review" | "InReview" | "Review" | "review" => Status::InReview,
             "Blocked" | "blocked" | "Block" | "block" => Status::Blocked,

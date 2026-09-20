@@ -27,6 +27,7 @@ fn main() -> Result<()> {
         }
         ocli::cli::Command::Open => ocli::commands::open::run(&context)?,
         ocli::cli::Command::FrontMatter { .. } => ocli::commands::fm::run(&context)?,
+        ocli::cli::Command::Status { .. } => ocli::commands::status::run(&context)?,
     };
 
     Ok(())

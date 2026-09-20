@@ -12,15 +12,15 @@ pub enum Command {
         status: Option<Status>,
     },
     New {
-        /// Explicit ticket key; overrides the branch-derived id (D25).
-        /// A case-insensitive mismatch with the branch warns and proceeds (D20c).
+        /// Explicit ticket key; overrides the branch-derived id.
+        /// A case-insensitive mismatch with the branch warns and proceeds.
         key: Option<String>,
         #[arg(long, short)]
         description: Option<String>,
         /// Override a template value, e.g. --set FeatureType=XX; repeatable.
         #[arg(long, value_name = "NAME=VALUE")]
         set: Vec<String>,
-        /// Override the repo olink fill (D13); default is the origin's name.
+        /// Override the repo olink fill; default is the origin's name.
         #[arg(long)]
         repo: Option<String>,
     },
@@ -31,7 +31,8 @@ pub enum Command {
         value: String,
     },
     Status {
-        value: String,
+        #[arg(value_parser = parse_strict)]
+        value: Status,
     },
 }
 
