@@ -30,16 +30,6 @@ pub const DEFAULT_SECTION_QUESTIONS: &str = "Open Questions";
 /// Default QuickAdd template path, relative to the vault root (D12/D22).
 pub const DEFAULT_TEMPLATE_PATH: &str = "templates/Feature.md";
 
-/// Frontmatter fields with code-level owners (D16); `fm` and config
-/// `[frontmatter]` types refuse them. (field, owning command).
-pub const MANAGED_FIELDS: &[(&str, &str)] = &[
-    ("status", "ocli status"),
-    ("done", "ocli status"),
-    ("Created", "ocli new"),
-    ("repo", "ocli new"),
-    ("owner", "ocli new"),
-];
-
 #[derive(Debug, Error)]
 pub enum ConfigFileError {
     /// Recoverable: the caller may proceed when the vault root comes from
@@ -68,10 +58,6 @@ pub enum ConfigFileError {
 
 #[derive(Debug, Error)]
 pub enum ConfigError {
-    #[error(
-        "frontmatter field {field:?} is managed by ocli; use {owner} (or remove the type from config)"
-    )]
-    ManagedField { field: String, owner: &'static str },
     #[error(
         "frontmatter field {field:?} is on the ignore list but also has a configured type; remove one of the two"
     )]
@@ -293,12 +279,6 @@ impl ConfigFile {
         }
 
         for name in self.frontmatter.types.keys() {
-            if let Some((_, owner)) = MANAGED_FIELDS.iter().find(|(f, _)| f == name) {
-                return Err(ConfigError::ManagedField {
-                    field: name.clone(),
-                    owner,
-                });
-            }
             if self.frontmatter.ignore.iter().any(|ig| ig == name) {
                 return Err(ConfigError::IgnoreTypeCollision {
                     field: name.clone(),
@@ -727,18 +707,15 @@ mod tests {
         assert!(err.to_string().contains("(?P<"));
     }
 
+    /// D16 (revised): managed fields lost their special status — a type
+    /// declared for them is honored, like any other field.
     #[test]
-    fn validate_rejects_managed_fields_naming_the_owner() {
+    fn validate_accepts_type_on_formerly_managed_field() {
         let mut cfg = valid_minimal();
         cfg.frontmatter
             .types
-            .insert("status".into(), FieldType::String);
-        let err = cfg.validate().unwrap_err();
-        assert!(matches!(err, ConfigError::ManagedField { .. }));
-        assert!(
-            err.to_string().contains("ocli status"),
-            "error should name the owning command: {err}"
-        );
+            .insert("status".into(), FieldType::Str);
+        cfg.validate().unwrap();
     }
 
     #[test]
@@ -746,7 +723,7 @@ mod tests {
         let mut cfg = valid_minimal();
         cfg.frontmatter
             .types
-            .insert("relates-to".into(), FieldType::String);
+            .insert("relates-to".into(), FieldType::Str);
         assert!(matches!(
             cfg.validate().unwrap_err(),
             ConfigError::IgnoreTypeCollision { .. }

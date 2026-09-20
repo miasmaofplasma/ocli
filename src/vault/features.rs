@@ -24,6 +24,22 @@ pub fn feature_note_paths(feature_dir: &Path) -> Result<Vec<PathBuf>, VaultError
     Ok(notes)
 }
 
+pub fn read_file_to_str(path: &Path) -> Result<String, VaultError> {
+    match std::fs::read_to_string(path) {
+        Ok(file) => Ok(file),
+        Err(e) => match e.kind() {
+            std::io::ErrorKind::NotFound => Err(VaultError::NoteNotFound {
+                path: path.display().to_string(),
+                error: e,
+            }),
+            _ => Err(VaultError::IoError {
+                path: path.display().to_string(),
+                error: e,
+            }),
+        },
+    }
+}
+
 fn is_note_file(path: &Path) -> bool {
     path.is_file()
         && path.extension().is_some_and(|ext| ext == "md")

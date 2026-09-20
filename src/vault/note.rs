@@ -2,6 +2,7 @@ use std::path::Path;
 
 use crate::vault::{
     VaultError,
+    features::read_file_to_str,
     frontmatter::{Frontmatter, deserialize_frontmatter, inner_yaml},
     markdown::{self},
 };
@@ -20,23 +21,7 @@ pub struct Note {
 impl Note {
     pub fn load(path: impl AsRef<Path>) -> Result<Self, VaultError> {
         let path = path.as_ref();
-        let text = match std::fs::read_to_string(path) {
-            Ok(file) => file,
-            Err(e) => match e.kind() {
-                std::io::ErrorKind::NotFound => {
-                    return Err(VaultError::NoteNotFound {
-                        path: path.display().to_string(),
-                        error: e,
-                    });
-                }
-                _ => {
-                    return Err(VaultError::IoError {
-                        path: path.display().to_string(),
-                        error: e,
-                    });
-                }
-            },
-        };
+        let text = read_file_to_str(path)?;
 
         // The note name is the file's stem (D4: the filename is the ID).
         // `file_stem` is effectively always present for a readable file;
@@ -114,10 +99,7 @@ mod tests {
             "---\r\nstatus: In Review\r\n---\r\nbody\r\n",
         );
         let note = Note::load(&path).unwrap();
-        assert_eq!(
-            note.frontmatter().unwrap().status,
-            Some(Status::InReview)
-        );
+        assert_eq!(note.frontmatter().unwrap().status, Some(Status::InReview));
     }
 
     #[test]
@@ -125,10 +107,7 @@ mod tests {
         let dir = tempfile::tempdir().unwrap();
         let path = write_note(dir.path(), "X-1.md", "---\nstatus: Complete\n---");
         let note = Note::load(&path).unwrap();
-        assert_eq!(
-            note.frontmatter().unwrap().status,
-            Some(Status::Complete)
-        );
+        assert_eq!(note.frontmatter().unwrap().status, Some(Status::Complete));
     }
 
     #[test]

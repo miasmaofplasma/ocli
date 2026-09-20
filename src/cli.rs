@@ -25,6 +25,14 @@ pub enum Command {
         repo: Option<String>,
     },
     Open,
+    #[command(visible_alias = "fm")]
+    FrontMatter {
+        key: String,
+        value: String,
+    },
+    Status {
+        value: String,
+    },
 }
 
 #[derive(Debug, Parser)]

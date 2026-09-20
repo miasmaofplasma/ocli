@@ -27,14 +27,14 @@ The vault is shared with Obsidian and the Meta Bind plugin, so `ocli` is conserv
 | Command | Effect |
 |---|---|
 | `ocli new [--description "..."]` | Render the vault's QuickAdd template into `features/<ID>.md` — ticket inferred from the branch (explicit key still accepted); fills `repo`, `description`, and `status: "In Progress"`, `Created` via the template's `{{DATE}}`; refuses to overwrite |
-| `ocli list [--status S] [--all-repos]` | Scan `features/`, print one block per ticket — id / description / status / repository, `-` for unset values; `--status` exact-matches the note's status; defaults to the current repo's tickets (D13), `--all-repos` lists everything; outside a repo the whole vault lists |
+| `ocli list [--status S] [--all-repos]` | Scan `features/`, print one block per ticket — id / description / status / repository, `-` for unset values; `--status` filters by a canonical status (a near-miss is a usage error); defaults to the current repo's tickets (D13), `--all-repos` lists everything; outside a repo the whole vault lists |
 | `ocli status <Status>` | Update the inferred ticket's status; keeps `done:` in sync |
 | `ocli fm <field> <value>` | General frontmatter setter — type rules from config, refuses managed and ignored fields |
 | `ocli progress / note / decision / question "<text>"` | Append timestamped entries to the ticket's configured `##` sections |
 | `ocli questions [--all]` | Cross-vault view of unchecked Open Questions entries |
-| `ocli open` | Open the current ticket's note in Obsidian (via the `obsidian://` URI scheme; requires the note to exist). Lands after git-context inference |
+| `ocli open` | Open the current ticket's note in Obsidian (via the `obsidian://` URI scheme; requires the note to exist) |
 
-Status vocabulary: `Backlog → In Progress → In Review → Complete`, plus occasional `Blocked` — validated by `ocli status`, which keeps `done:` in sync with `Complete`.
+Status vocabulary: `Backlog → In Progress → In Review → Complete`, plus occasional `Blocked` — validated by `ocli status`, which keeps `done:` in sync with `Complete`. A note whose status isn't in the vocabulary still lists (shown verbatim); `--status`/`status` reject it (D37).
 
 ## Configuration
 
@@ -75,4 +75,4 @@ id             = '{FeatureType}-{TicketNumber}'
 - Rust (edition 2024), built with cargo; devenv/nix for tooling (`.envrc` + `devenv.nix`).
 - Testing uses a fixture vault under `tests/` — never the real vault.
 - Key dependencies: `clap`, `yaml_serde`, `toml`, `gix` (gitoxide — pure-Rust git access), `directories`, `regex`, `chrono`, `thiserror`/`color-eyre`, `tracing` + `tracing-subscriber`.
-- Project status: **mid implementation** — config (parse/validate/three-source resolution), the markdown span locator, the frontmatter read projection, `Note` loading, the features-directory scan, the git layer, the create path (`new`: branch→id inference, template rendering with the four-layer value map, `repo`/`description`/`status` fills, refuse-to-overwrite write), and `list` with D13 repo filtering are landed and tested — 128 tests across unit and integration tiers. Git specifics: a `gix` adapter (branch/origin discovery) behind a crate-private wall with `context()` as its only fact, and the `Context` object carries the git snapshot (branch + repo identity) derived tolerantly from the working directory — every command can ask "which ticket am I on, which repo is this" without touching git internals. `open` is accepted-but-unimplemented. See `PLAN.md` for design decisions, remaining work, and open questions.
+- Project status: **Phase 5 complete** — config (parse/validate/three-source resolution), the markdown span locator, the frontmatter read projection (a typed `Status` with a read-faithful `Unknown` fallback — D37), `Note` loading, the features-directory scan, the git layer, the create path (`new`: branch→id inference, template rendering with the four-layer value map, `repo`/`description`/`status` fills, refuse-to-overwrite write), `list` with D13 repo filtering, and `open` (the `obsidian://` URI opener) are landed and tested — 139 tests across unit and integration tiers; clippy clean. Git specifics: a `gix` adapter (branch/origin discovery) behind a crate-private wall with `context()` as its only fact, and the `Context` object carries the git snapshot (branch + repo identity) derived tolerantly from the working directory — every command can ask "which ticket am I on, which repo is this" without touching git internals. Next: Phase 6, the write path (`status`, `fm`, the `progress`/`note`/`decision`/`question` appends). See `PLAN.md` for design decisions, remaining work, and open questions.

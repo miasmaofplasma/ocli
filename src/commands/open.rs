@@ -2,17 +2,13 @@
 //! `obsidian://` URI to the OS opener. Read-only: the note must already
 //! exist (`new` creates it); the only side effect is the URI hand-off.
 
-use std::path::{Path, PathBuf};
+use std::path::Path;
 
 use color_eyre::eyre::{WrapErr, eyre};
 use percent_encoding::{NON_ALPHANUMERIC, utf8_percent_encode};
 use tracing::instrument;
 
-use crate::{
-    cli,
-    context::Context,
-    vault::{self, VaultError},
-};
+use crate::{cli, context::Context};
 
 /// The URI handed to the OS opener: Obsidian's `open` action (D29). The
 /// `path` parameter takes the note's absolute file-system path — Obsidian
@@ -31,34 +27,6 @@ fn uri_for(note: &Path) -> String {
     )
 }
 
-/// The note file for the current ticket: branch → id (D25), then the
-/// existence check D29 requires — `open` never creates, a missing note
-/// is the "run `ocli new`" moment (D26).
-fn note_path(context: &Context) -> Result<PathBuf, VaultError> {
-    let (branch, caps) = super::current_ticket(context)?;
-    let tickets = &context.config().tickets;
-    let name = vault::note_name(&branch, &tickets.pattern, &caps, &tickets.id)?;
-    let path = context.features_path().join(format!("{name}.md"));
-
-    // `is_file`, not exists: a directory at the note's path is not a
-    // note. The metadata error (usually NotFound) is the real
-    // `NoteNotFound` source — no synthesized failure for the common case.
-    match std::fs::metadata(&path) {
-        Ok(metadata) if metadata.is_file() => Ok(path),
-        Ok(_) => Err(VaultError::NoteNotFound {
-            path: path.display().to_string(),
-            error: std::io::Error::new(
-                std::io::ErrorKind::InvalidInput,
-                "path exists but is not a file",
-            ),
-        }),
-        Err(error) => Err(VaultError::NoteNotFound {
-            path: path.display().to_string(),
-            error,
-        }),
-    }
-}
-
 /// Opens the note in Obsidian. Success means the launcher accepted the
 /// hand-off (nonzero launcher exits — e.g. "no handler registered" —
 /// propagate as errors); it cannot mean "the note is on screen": the OS
@@ -69,7 +37,7 @@ pub fn run(context: &Context) -> color_eyre::Result<()> {
         return Err(eyre!("open command incorrectly called"));
     };
 
-    let note = note_path(context)?;
+    let note = super::note_path(context)?;
     let uri = uri_for(&note);
     open::that(&uri).wrap_err_with(|| format!("could not open {uri}"))?;
 

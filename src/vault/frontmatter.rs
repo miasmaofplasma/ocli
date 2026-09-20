@@ -5,7 +5,7 @@ use serde::Deserialize;
 #[cfg(test)]
 use crate::vault::error_chain;
 use crate::{
-    ftypes::Field,
+    ftypes::{Field, render_field},
     status::Status,
     vault::{VaultError, markdown::Span},
 };
@@ -88,6 +88,13 @@ fn validate_field(name: &str, field: &Field) -> Result<(), VaultError> {
                 ));
             }
         }
+        // Bools/numbers are typed at construction — nothing to validate.
+        Field::Bool(_) | Field::Int(_) | Field::Float(_) => {}
+        Field::List(items) => {
+            for item in items {
+                validate_field(name, item)?;
+            }
+        }
     }
     Ok(())
 }
@@ -138,8 +145,8 @@ fn line_ending_before(prefix: &str) -> &'static str {
 /// Operates on the *inner* frontmatter text (between the `---`
 /// delimiters); the caller splices it back by span. Pure text-in/text-out
 /// so Phase 6's `status`/`fm` reuse it inside the D11 write path.
-pub fn set_field(fm: &str, name: &str, field: Field) -> Result<String, VaultError> {
-    validate_field(name, &field)?;
+pub fn set_field(fm: &str, name: &str, field: &Field) -> Result<String, VaultError> {
+    validate_field(name, field)?;
 
     let Some(region) = field_region(fm, name) else {
         return Err(VaultError::FieldNotFound {
@@ -151,7 +158,7 @@ pub fn set_field(fm: &str, name: &str, field: Field) -> Result<String, VaultErro
     let line_ending = line_ending_before(&fm[..region.end]);
     let mut out = String::with_capacity(fm.len());
     out.push_str(&fm[..region.start]);
-    out.push_str(&format!("{name}: {field}"));
+    out.push_str(&render_field(name, field, line_ending));
     out.push_str(line_ending);
     out.push_str(&fm[region.end..]);
     Ok(out)
@@ -161,15 +168,16 @@ pub fn set_field(fm: &str, name: &str, field: Field) -> Result<String, VaultErro
 /// ensure the field is absent (e.g. after [`set_field`]'s
 /// `FieldNotFound`) — appending an existing key would produce invalid
 /// YAML (duplicate keys).
-pub fn append_field(fm: &str, name: &str, field: Field) -> Result<String, VaultError> {
-    validate_field(name, &field)?;
+pub fn append_field(fm: &str, name: &str, field: &Field) -> Result<String, VaultError> {
+    validate_field(name, field)?;
 
     let mut out = fm.to_string();
     let eol = if out.ends_with("\r\n") { "\r\n" } else { "\n" };
     if !out.is_empty() && !out.ends_with('\n') {
         out.push_str(eol);
     }
-    out.push_str(&format!("{name}: {field}{eol}"));
+    out.push_str(&render_field(name, field, eol));
+    out.push_str(eol);
     Ok(out)
 }
 
@@ -179,8 +187,8 @@ pub fn append_field(fm: &str, name: &str, field: Field) -> Result<String, VaultE
 /// missing field is worth a warning, not a blocker). The append emits a
 /// stderr warning (D26); `fm` — where a manually typed field name must
 /// not become a junk field — uses strict [`set_field`] instead.
-pub fn set_or_append_field(fm: &str, name: &str, field: Field) -> Result<String, VaultError> {
-    match set_field(fm, name, field.clone()) {
+pub fn set_or_append_field(fm: &str, name: &str, field: &Field) -> Result<String, VaultError> {
+    match set_field(fm, name, field) {
         Ok(fm) => Ok(fm),
         Err(err) => match err {
             VaultError::FieldNotFound { .. } => {
@@ -271,7 +279,7 @@ mod tests {
     fn missing_field_errors_with_a_suggestion() {
         let fm = "estimate:\nstatus: Backlog\n";
 
-        let err = set_field(fm, "estmate", Field::Str("3".into())).unwrap_err();
+        let err = set_field(fm, "estmate", &Field::Str("3".into())).unwrap_err();
 
         assert!(matches!(err, VaultError::FieldNotFound { .. }));
         let message = err.to_string();
@@ -287,7 +295,7 @@ mod tests {
     /// the error.
     #[test]
     fn append_field_adds_the_field_at_the_end() {
-        let out = append_field("status: Backlog\n", "estimate", Field::Str("3".into())).unwrap();
+        let out = append_field("status: Backlog\n", "estimate", &Field::Str("3".into())).unwrap();
 
         assert_eq!(out, "status: Backlog\nestimate: \"3\"\n");
     }
@@ -295,7 +303,7 @@ mod tests {
     /// append_field is line-ending aware: a CRLF frontmatter keeps CRLF.
     #[test]
     fn append_field_keeps_crlf_endings() {
-        let out = append_field("status: Backlog\r\n", "estimate", Field::Str("3".into())).unwrap();
+        let out = append_field("status: Backlog\r\n", "estimate", &Field::Str("3".into())).unwrap();
 
         assert_eq!(out, "status: Backlog\r\nestimate: \"3\"\r\n");
     }
@@ -405,7 +413,7 @@ mod tests {
     fn replaces_a_scalar_field_in_place() {
         let fm = "Created: 2026-09-05 10:30\ndescription:\nrepo:\nstatus: Backlog\n";
 
-        let out = set_field(fm, "repo", Field::Olink("connected-module-item-api".into())).unwrap();
+        let out = set_field(fm, "repo", &Field::Olink("connected-module-item-api".into())).unwrap();
 
         assert_eq!(
             out,
@@ -420,7 +428,7 @@ mod tests {
     fn replaces_a_block_region_with_the_scalar_line() {
         let fm = "tags:\n  - feature\n  - codewaves\nstatus: Backlog\n";
 
-        let out = set_field(fm, "tags", Field::Str("x".into())).unwrap();
+        let out = set_field(fm, "tags", &Field::Str("x".into())).unwrap();
 
         assert_eq!(out, "tags: \"x\"\nstatus: Backlog\n");
     }
@@ -431,7 +439,7 @@ mod tests {
     fn blank_line_terminates_the_region() {
         let fm = "status: Backlog\n\nrepo:\n";
 
-        let out = set_field(fm, "status", Field::Str("Done".into())).unwrap();
+        let out = set_field(fm, "status", &Field::Str("Done".into())).unwrap();
 
         assert_eq!(out, "status: \"Done\"\n\nrepo:\n");
     }
@@ -443,12 +451,12 @@ mod tests {
         let out = set_field(
             "repo:\n",
             "repo",
-            Field::Olink("connected-module-item-api".into()),
+            &Field::Olink("connected-module-item-api".into()),
         )
         .unwrap();
         assert_eq!(out, "repo: \"[[connected-module-item-api]]\"\n");
 
-        let out = set_field("repo:\n", "repo", Field::Olink("[[path/Ada|Ada]]".into())).unwrap();
+        let out = set_field("repo:\n", "repo", &Field::Olink("[[path/Ada|Ada]]".into())).unwrap();
         assert_eq!(out, "repo: \"[[path/Ada|Ada]]\"\n");
     }
 
@@ -456,7 +464,7 @@ mod tests {
     /// wikilinks.
     #[test]
     fn olink_with_unbalanced_brackets_is_rejected() {
-        let err = set_field("repo:\n", "repo", Field::Olink("a]b".into())).unwrap_err();
+        let err = set_field("repo:\n", "repo", &Field::Olink("a]b".into())).unwrap_err();
 
         assert!(matches!(err, VaultError::InvalidFieldValue { .. }));
     }
@@ -466,7 +474,7 @@ mod tests {
     #[test]
     fn str_with_newline_is_rejected() {
         let err =
-            set_field("description:\n", "description", Field::Str("a\nb".into())).unwrap_err();
+            set_field("description:\n", "description", &Field::Str("a\nb".into())).unwrap_err();
 
         assert!(matches!(err, VaultError::InvalidFieldValue { .. }));
     }
@@ -478,7 +486,7 @@ mod tests {
         let out = set_field(
             "description:\n",
             "description",
-            Field::Str("a\"b\\c".into()),
+            &Field::Str("a\"b\\c".into()),
         )
         .unwrap();
 
@@ -491,7 +499,7 @@ mod tests {
     fn set_or_append_replaces_when_present() {
         let fm = "status: Backlog\nrepo:\n";
 
-        let out = set_or_append_field(fm, "status", Field::Str("Done".into())).unwrap();
+        let out = set_or_append_field(fm, "status", &Field::Str("Done".into())).unwrap();
 
         assert_eq!(out, "status: \"Done\"\nrepo:\n");
     }
@@ -502,7 +510,7 @@ mod tests {
     #[test]
     fn set_or_append_appends_when_missing() {
         let out =
-            set_or_append_field("status: Backlog\n", "estimate", Field::Str("3".into())).unwrap();
+            set_or_append_field("status: Backlog\n", "estimate", &Field::Str("3".into())).unwrap();
 
         assert_eq!(out, "status: Backlog\nestimate: \"3\"\n");
     }
@@ -516,7 +524,7 @@ mod tests {
         let span = document.frontmatter().unwrap();
 
         let inner = inner_yaml(&text[span]);
-        let edited = set_field(inner, "status", Field::Str("Done".into())).unwrap();
+        let edited = set_field(inner, "status", &Field::Str("Done".into())).unwrap();
         let out = splice_inner(text, span, &edited);
 
         assert_eq!(out, "---\nstatus: \"Done\"\n---\n# body\n");
@@ -530,7 +538,7 @@ mod tests {
         let span = document.frontmatter().unwrap();
 
         let inner = inner_yaml(&text[span]);
-        let edited = set_field(inner, "status", Field::Str("Done".into())).unwrap();
+        let edited = set_field(inner, "status", &Field::Str("Done".into())).unwrap();
         let out = splice_inner(text, span, &edited);
 
         assert_eq!(out, "---\r\nstatus: \"Done\"\r\n---\r\n# body\r\n");

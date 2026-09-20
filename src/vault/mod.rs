@@ -2,6 +2,7 @@ use std::collections::HashMap;
 
 use regex::Regex;
 
+pub mod edit;
 pub mod features;
 pub mod frontmatter;
 pub mod markdown;
@@ -75,6 +76,12 @@ pub enum VaultError {
         "unsupported template construct {construct:?} on line {line}; the grammar is {{{{VALUE:name}}}} and {{{{DATE:YYYY-MM-DD HH:mm}}}}"
     )]
     UnsupportedConstruct { construct: String, line: usize },
+    #[error("could not find path at {path}")]
+    PathNotFound { path: String },
+    /// The optimistic-retry bound (D11) ran out: the note kept changing
+    /// between read and write — a concurrent editor is very active.
+    #[error("the note at {path} kept changing while editing; try again")]
+    NoteChangedUnderUs { path: String },
 }
 
 /// Matches `branch` against the ticket pattern once — the D20b hard
