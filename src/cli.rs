@@ -2,6 +2,7 @@ use std::path::PathBuf;
 
 use crate::status::{Status, parse_strict};
 use clap::{Parser, Subcommand};
+use clap_complete::Shell;
 
 #[derive(Debug, Subcommand)]
 pub enum Command {
@@ -45,6 +46,10 @@ pub enum Command {
         #[command(subcommand)]
         action: Option<SectionAction>,
     },
+    Completion {
+        #[arg(help = "The shell to generate completions for")]
+        shell: Shell,
+    },
 }
 
 /// The write half of the `section` command — when omitted (`ocli section
@@ -59,6 +64,7 @@ pub enum SectionAction {
 }
 
 #[derive(Debug, Parser)]
+#[command(name = "ocli")]
 pub struct Cli {
     #[command(subcommand)]
     pub command: Command,

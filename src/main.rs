@@ -1,6 +1,12 @@
+use clap::CommandFactory;
 use clap::Parser;
 use color_eyre::eyre::{Result, WrapErr};
-use ocli::{cli::Cli, config::Config, context::Context};
+use ocli::{
+    cli::{Cli, Command},
+    commands,
+    config::Config,
+    context::Context,
+};
 use tracing_subscriber::EnvFilter;
 
 fn main() -> Result<()> {
@@ -10,28 +16,41 @@ fn main() -> Result<()> {
 
     init_tracing()?;
     let cli = Cli::parse();
+
+    // `completion` is pure clap output — no vault, no git, no config. It
+    // runs before `Context` exists so packagers (the flake's `postInstall`)
+    // can generate shell completions without mocking a vault root.
+    if let Command::Completion { shell } = &cli.command {
+        let mut cmd = ocli::cli::Cli::command();
+        clap_complete::generate(*shell, &mut cmd, env!("CARGO_BIN_NAME"), &mut std::io::stdout());
+        return Ok(());
+    }
+
     let config = Config::load(cli.vault.clone())?;
     let context = Context::new(config, cli, &std::env::current_dir()?)?;
     tracing::debug!("ocli initialized");
 
     match &context.cli().command {
-        ocli::cli::Command::List { .. } => {
-            let rows = ocli::commands::list::run(&context)?;
+        Command::List { .. } => {
+            let rows = commands::list::run(&context)?;
             for row in rows {
                 println!("{row}");
             }
         }
-        ocli::cli::Command::New { .. } => {
-            let path = ocli::commands::new::run(&context)?;
+        Command::New { .. } => {
+            let path = commands::new::run(&context)?;
             println!("{}", path.display());
         }
-        ocli::cli::Command::Open => ocli::commands::open::run(&context)?,
-        ocli::cli::Command::FrontMatter { .. } => ocli::commands::fm::run(&context)?,
-        ocli::cli::Command::Status { .. } => ocli::commands::status::run(&context)?,
-        ocli::cli::Command::Section { .. } => {
-            let section = ocli::commands::section::run(&context)?;
+        Command::Open => commands::open::run(&context)?,
+        Command::FrontMatter { .. } => commands::fm::run(&context)?,
+        Command::Status { .. } => commands::status::run(&context)?,
+        Command::Section { .. } => {
+            let section = commands::section::run(&context)?;
             section.inspect(|section| println!("{section}"));
         }
+        // Handled before `Context` (needs no environment); kept only to
+        // satisfy the exhaustive match.
+        Command::Completion { .. } => unreachable!("completion dispatched before context"),
     };
 
     Ok(())

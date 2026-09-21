@@ -44,12 +44,18 @@
             };
             # `git` is test-only (D34 fixtures build repos via the CLI); the
             # binary itself uses `gix`, not the `git` executable.
-            nativeBuildInputs = [ pkgs.makeWrapper pkgs.git ];
+            nativeBuildInputs = [ pkgs.makeWrapper pkgs.git pkgs.installShellFiles];
             # `ocli open` runs `xdg-open` on Linux; on macOS the `open`
             # crate uses the system `open`, so the opener is Linux-only.
             buildInputs = pkgs.lib.optionals pkgs.stdenv.hostPlatform.isLinux [ pkgs.xdg-utils ];
             postInstall = pkgs.lib.optionalString pkgs.stdenv.hostPlatform.isLinux ''
               wrapProgram "$out/bin/ocli" --prefix PATH : ${pkgs.xdg-utils}/bin
+
+              # `completion` needs no vault/git/config, so it runs unconfigured.
+              installShellCompletion --cmd ocli \
+                --bash <($out/bin/ocli completion bash) \
+                --zsh <($out/bin/ocli completion zsh) \
+                --fish <($out/bin/ocli completion fish)
             '';
           };
         });
